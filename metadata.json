@@ -1,0 +1,5 @@
+{
+  "name": "CRM para Agentes de Seguros",
+  "description": "Una aplicación de CRM completa para que los agentes de seguros gestionen leads, clientes, pólizas y su pipeline de ventas. Integrado con Supabase para la persistencia de datos.",
+  "requestFramePermissions": []
+}
