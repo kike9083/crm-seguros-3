@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
-import { getProducts, deleteProduct } from '../services/api';
+import { getProducts, deleteProduct, getErrorMessage } from '../services/api';
 import { Product } from '../types';
 import Spinner from './Spinner';
 import PlusIcon from './icons/PlusIcon';
@@ -16,10 +15,11 @@ const ProductsList: React.FC = () => {
     const fetchProducts = useCallback(async () => {
         try {
             setLoading(true);
+            setError(null);
             const data = await getProducts();
             setProducts(data);
         } catch (err) {
-            setError('No se pudieron cargar los productos.');
+            setError(`No se pudieron cargar los productos: ${getErrorMessage(err)}`);
             console.error(err);
         } finally {
             setLoading(false);
@@ -51,7 +51,7 @@ const ProductsList: React.FC = () => {
                 await deleteProduct(id);
                 fetchProducts();
             } catch (err) {
-                alert('No se pudo eliminar el producto.');
+                alert(`No se pudo eliminar el producto: ${getErrorMessage(err)}`);
                 console.error(err);
             }
         }

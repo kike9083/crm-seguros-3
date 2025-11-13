@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
-import { getLeads } from '../services/api';
+import { getLeads, getErrorMessage } from '../services/api';
 import { Lead, LeadStatus } from '../types';
 import { LEAD_STATUSES, STATUS_COLORS } from '../constants';
 import Spinner from './Spinner';
@@ -51,10 +50,11 @@ const PipelineBoard: React.FC = () => {
     const fetchLeads = useCallback(async () => {
         try {
             setLoading(true);
+            setError(null);
             const data = await getLeads();
             setLeads(data);
         } catch (err) {
-            setError('No se pudieron cargar los leads.');
+            setError(`No se pudieron cargar los leads: ${getErrorMessage(err)}`);
             console.error(err);
         } finally {
             setLoading(false);

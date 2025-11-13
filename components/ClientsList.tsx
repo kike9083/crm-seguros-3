@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
-import { getClients } from '../services/api';
+import { getClients, getErrorMessage } from '../services/api';
 import { Client } from '../types';
 import Spinner from './Spinner';
 import ClientModal from './ClientModal';
@@ -15,10 +14,11 @@ const ClientsList: React.FC = () => {
     const fetchClients = useCallback(async () => {
         try {
             setLoading(true);
+            setError(null);
             const data = await getClients();
             setClients(data);
         } catch (err) {
-            setError('No se pudieron cargar los clientes.');
+            setError(`No se pudieron cargar los clientes: ${getErrorMessage(err)}`);
             console.error(err);
         } finally {
             setLoading(false);

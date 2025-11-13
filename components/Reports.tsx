@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { getExpiringPolicies } from '../services/api';
+import { getExpiringPolicies, getErrorMessage } from '../services/api';
 import { Policy } from '../types';
 import Spinner from './Spinner';
 
@@ -14,10 +13,11 @@ const Reports: React.FC = () => {
         const fetchPolicies = async () => {
             try {
                 setLoading(true);
+                setError(null);
                 const data = await getExpiringPolicies(days);
                 setPolicies(data);
             } catch (err) {
-                setError('No se pudieron cargar las pólizas por vencer.');
+                setError(`No se pudieron cargar las pólizas por vencer: ${getErrorMessage(err)}`);
                 console.error(err);
             } finally {
                 setLoading(false);

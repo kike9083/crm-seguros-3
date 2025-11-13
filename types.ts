@@ -1,7 +1,13 @@
-
 export type LeadStatus = 'NUEVO' | 'CONTACTADO' | 'CALIFICADO' | 'PERDIDO' | 'GANADO';
 export type TaskStatus = 'PENDIENTE' | 'EN PROGRESO' | 'COMPLETADA';
 export type PolicyStatus = 'ACTIVA' | 'PENDIENTE PAGO' | 'CANCELADA' | 'VENCIDA';
+export type UserRole = 'ADMIN' | 'AGENTE';
+
+export interface Profile {
+    id: string; // uuid
+    nombre: string;
+    rol: UserRole;
+}
 
 export interface Lead {
     id: number;
@@ -11,7 +17,7 @@ export interface Lead {
     telefono: string;
     fuente: string;
     estatus_lead: LeadStatus;
-    user_asignado_id?: string; // Assuming UUID from Supabase auth
+    agent_id?: string;
     notas?: string;
 }
 
@@ -23,6 +29,7 @@ export interface Client {
     telefono: string;
     fecha_nacimiento?: string;
     lead_origen_id?: number;
+    agent_id?: string;
 }
 
 export interface Policy {
@@ -35,8 +42,9 @@ export interface Policy {
     fecha_vencimiento: string;
     estatus_poliza: PolicyStatus;
     comision_agente: number;
-    clients: { nombre: string } | { nombre: string }[] | null; // For joins
-    products: { nombre: string } | { nombre: string }[] | null; // For joins
+    agent_id?: string;
+    clients: { nombre: string } | { nombre: string }[] | null; 
+    products: { nombre: string } | { nombre: string }[] | null;
 }
 
 export interface Product {
@@ -61,6 +69,16 @@ export interface Task {
     prioridad: 'ALTA' | 'MEDIA' | 'BAJA';
     descripcion: string;
     estatus: TaskStatus;
+    agent_id?: string;
     leads?: { nombre: string } | { nombre: string }[] | null;
     clients?: { nombre: string } | { nombre: string }[] | null;
+}
+
+export interface FileObject {
+  name: string;
+  id: string;
+  updated_at: string;
+  created_at: string;
+  last_accessed_at: string;
+  metadata: Record<string, any>;
 }

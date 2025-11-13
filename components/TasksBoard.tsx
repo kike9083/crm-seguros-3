@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getTasks } from '../services/api';
+import { getTasks, getErrorMessage } from '../services/api';
 import { Task, TaskStatus } from '../types';
 import { TASK_STATUSES, STATUS_COLORS } from '../constants';
 import Spinner from './Spinner';
@@ -69,10 +69,11 @@ const TasksBoard: React.FC = () => {
     const fetchTasks = useCallback(async () => {
         try {
             setLoading(true);
+            setError(null);
             const data = await getTasks();
             setTasks(data);
         } catch (err) {
-            setError('No se pudieron cargar las tareas.');
+            setError(`No se pudieron cargar las tareas: ${getErrorMessage(err)}`);
             console.error(err);
         } finally {
             setLoading(false);

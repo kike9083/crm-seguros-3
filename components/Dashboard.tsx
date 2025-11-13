@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getDashboardStats, getUpcomingTasks, getLeadsByStatus } from '../services/api';
+import { getDashboardStats, getUpcomingTasks, getLeadsByStatus, getErrorMessage } from '../services/api';
 import { Task } from '../types';
 import { LEAD_STATUSES, STATUS_COLORS } from '../constants';
 import Spinner from './Spinner';
@@ -27,7 +27,7 @@ const StatCard: React.FC<{ title: string; value: string; icon: React.ReactNode }
 );
 
 const UpcomingTask: React.FC<{ task: Task }> = ({ task }) => {
-    // FIX: Handle cases where related leads/clients can be an array.
+    // Handle cases where related leads/clients can be an array.
     const getRelatedName = (relation: { nombre: string } | { nombre: string }[] | null | undefined): string | null => {
         if (!relation) return null;
         if (Array.isArray(relation)) {
@@ -52,7 +52,10 @@ const UpcomingTask: React.FC<{ task: Task }> = ({ task }) => {
 };
 
 const PipelineChart: React.FC<{ data: PipelineData }> = ({ data }) => {
-    const total = Object.values(data).reduce((sum, count) => sum + count, 0);
+    // FIX: Operator '+' cannot be applied to types 'unknown' and 'number'.
+    // Explicitly type the accumulator `sum` to `number` to fix type inference issue.
+    // By using the generic parameter on `reduce`, we ensure `total` is correctly typed as a number.
+    const total = Object.values(data).reduce<number>((sum, count) => sum + Number(count), 0);
     if (total === 0) return <p className="text-text-secondary">No hay datos de leads para mostrar.</p>;
 
     return (
@@ -61,6 +64,8 @@ const PipelineChart: React.FC<{ data: PipelineData }> = ({ data }) => {
                 {LEAD_STATUSES.map(status => {
                     const count = data[status] || 0;
                     if (count === 0) return null;
+                    // FIX: The right-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+                    // This is fixed by ensuring `total` is correctly calculated as a number above.
                     const percentage = (count / total) * 100;
                     return (
                         <div key={status} className={`${STATUS_COLORS[status]}`} style={{ width: `${percentage}%` }} title={`${status}: ${count}`}></div>
@@ -96,6 +101,7 @@ const Dashboard: React.FC = () => {
         const fetchData = async () => {
             try {
                 setLoading(true);
+                setError(null);
                 const [statsData, tasksData, pipelineCounts] = await Promise.all([
                     getDashboardStats(),
                     getUpcomingTasks(),
@@ -105,7 +111,7 @@ const Dashboard: React.FC = () => {
                 setUpcomingTasks(tasksData);
                 setPipelineData(pipelineCounts);
             } catch (err) {
-                setError('No se pudieron cargar los datos del dashboard.');
+                setError(`No se pudieron cargar los datos del dashboard: ${getErrorMessage(err)}`);
                 console.error(err);
             } finally {
                 setLoading(false);

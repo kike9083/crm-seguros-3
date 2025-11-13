@@ -1,5 +1,7 @@
 
-import React, { useState, useCallback } from 'react';
+import React from 'react';
+import { AuthProvider } from './components/auth/AuthContext';
+import Auth from './components/auth/Auth';
 import SideNav from './components/SideNav';
 import Header from './components/Header';
 import Dashboard from './components/Dashboard';
@@ -7,15 +9,20 @@ import PipelineBoard from './components/PipelineBoard';
 import ClientsList from './components/ClientsList';
 import TasksBoard from './components/TasksBoard';
 import PoliciesList from './components/PoliciesList';
-import ProductsList from './components/ProductsList';
+import Settings from './components/settings/Settings';
+import { Profile } from './types';
 import Reports from './components/Reports';
 
-type View = 'dashboard' | 'pipeline' | 'clients' | 'tasks' | 'policies' | 'products' | 'reports';
+type View = 'dashboard' | 'pipeline' | 'clients' | 'tasks' | 'policies' | 'settings' | 'reports';
 
-const App: React.FC = () => {
-    const [currentView, setCurrentView] = useState<View>('dashboard');
+interface MainAppProps {
+    profile: Profile;
+}
 
-    const renderView = useCallback(() => {
+const MainApp: React.FC<MainAppProps> = ({ profile }) => {
+    const [currentView, setCurrentView] = React.useState<View>('dashboard');
+
+    const renderView = React.useCallback(() => {
         switch (currentView) {
             case 'dashboard':
                 return <Dashboard />;
@@ -27,9 +34,10 @@ const App: React.FC = () => {
                 return <TasksBoard />;
             case 'policies':
                 return <PoliciesList />;
-            case 'products':
-                return <ProductsList />;
+            case 'settings':
+                return <Settings />;
             case 'reports':
+                // FIX: Correctly render the Reports component, which was previously undefined.
                 return <Reports />;
             default:
                 return <Dashboard />;
@@ -38,14 +46,25 @@ const App: React.FC = () => {
 
     return (
         <div className="flex h-screen bg-background text-text-primary">
-            <SideNav currentView={currentView} setCurrentView={setCurrentView} />
+            <SideNav currentView={currentView} setCurrentView={setCurrentView} profile={profile} />
             <div className="flex-1 flex flex-col overflow-hidden">
-                <Header currentView={currentView} />
+                <Header currentView={currentView} profile={profile} />
                 <main className="flex-1 overflow-x-hidden overflow-y-auto bg-background p-4 sm:p-6 lg:p-8">
                     {renderView()}
                 </main>
             </div>
         </div>
+    );
+};
+
+
+const App: React.FC = () => {
+    return (
+        <AuthProvider>
+            <Auth>
+                {(profile) => <MainApp profile={profile} />}
+            </Auth>
+        </AuthProvider>
     );
 };
 

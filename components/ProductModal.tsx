@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { createProduct, updateProduct } from '../services/api';
+import { createProduct, updateProduct, getErrorMessage } from '../services/api';
 import { Product } from '../types';
 
 interface ProductModalProps {
@@ -66,7 +65,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, onSave })
             }
             onSave();
         } catch (err) {
-            setError('Error al guardar el producto. Inténtelo de nuevo.');
+            setError(`Error al guardar el producto: ${getErrorMessage(err)}`);
             console.error(err);
         } finally {
             setIsSaving(false);

@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
-import { createTask, updateTask, getLeads, getClients } from '../services/api';
+import { createTask, updateTask, getLeads, getClients, getErrorMessage } from '../services/api';
 import { Task, TaskStatus, Lead, Client } from '../types';
 import { TASK_STATUSES } from '../constants';
+import { useAuth } from './auth/AuthContext';
 
 interface TaskModalProps {
     task: Task | null;
@@ -11,6 +11,7 @@ interface TaskModalProps {
 }
 
 const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onSave }) => {
+    const { user } = useAuth();
     const [formData, setFormData] = useState({
         descripcion: '',
         tipo: 'LLAMADA' as 'LLAMADA' | 'EMAIL' | 'CITA' | 'WHATSAPP',
@@ -19,6 +20,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onSave }) => {
         estatus: 'PENDIENTE' as TaskStatus,
         lead_id: undefined as number | undefined,
         client_id: undefined as number | undefined,
+        agent_id: user?.id
     });
     const [leads, setLeads] = useState<Lead[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
@@ -29,11 +31,18 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onSave }) => {
         const fetchData = async () => {
             try {
                 const [leadsData, clientsData] = await Promise.all([getLeads(), getClients()]);
-                setLeads(leadsData);
+                
+                // Obtener un conjunto de IDs de leads que ya han sido convertidos a clientes.
+                const convertedLeadIds = new Set(clientsData.map(c => c.lead_origen_id).filter(id => id != null));
+                
+                // Filtrar la lista de leads para excluir aquellos que ya son clientes.
+                const filteredLeads = leadsData.filter(lead => !convertedLeadIds.has(lead.id));
+
+                setLeads(filteredLeads);
                 setClients(clientsData);
             } catch (err) {
                 console.error("Failed to fetch leads and clients", err);
-                setError("No se pudieron cargar los contactos para asociar la tarea.");
+                setError(`No se pudieron cargar los contactos: ${getErrorMessage(err)}`);
             }
         };
         fetchData();
@@ -47,9 +56,10 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onSave }) => {
                 estatus: task.estatus,
                 lead_id: task.lead_id,
                 client_id: task.client_id,
+                agent_id: task.agent_id || user?.id
             });
         }
-    }, [task]);
+    }, [task, user]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -85,7 +95,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onSave }) => {
             }
             onSave();
         } catch (err) {
-            setError('Error al guardar la tarea. Inténtelo de nuevo.');
+            setError(`Error al guardar la tarea: ${getErrorMessage(err)}`);
             console.error(err);
         } finally {
             setIsSaving(false);

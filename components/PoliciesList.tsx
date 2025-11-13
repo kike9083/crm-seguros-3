@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
-import { getPolicies } from '../services/api';
+import { getPolicies, getErrorMessage } from '../services/api';
 import { Policy } from '../types';
 import Spinner from './Spinner';
 import PlusIcon from './icons/PlusIcon';
@@ -16,10 +15,11 @@ const PoliciesList: React.FC = () => {
     const fetchPolicies = useCallback(async () => {
         try {
             setLoading(true);
+            setError(null);
             const data = await getPolicies();
             setPolicies(data);
         } catch (err) {
-            setError('No se pudieron cargar las pólizas.');
+            setError(`No se pudieron cargar las pólizas: ${getErrorMessage(err)}`);
             console.error(err);
         } finally {
             setLoading(false);

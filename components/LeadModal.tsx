@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
-import { createLead, updateLead, promoteLeadToClient } from '../services/api';
+import { createLead, updateLead, promoteLeadToClient, getErrorMessage } from '../services/api';
 import { Lead, LeadStatus } from '../types';
 import { LEAD_STATUSES } from '../constants';
+import { useAuth } from './auth/AuthContext';
 
 interface LeadModalProps {
     lead: Lead | null;
@@ -11,6 +11,7 @@ interface LeadModalProps {
 }
 
 const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
+    const { user } = useAuth();
     const [formData, setFormData] = useState({
         nombre: '',
         email: '',
@@ -18,6 +19,7 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
         fuente: 'Web',
         estatus_lead: 'NUEVO' as LeadStatus,
         notas: '',
+        agent_id: user?.id
     });
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -31,9 +33,10 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
                 fuente: lead.fuente,
                 estatus_lead: lead.estatus_lead,
                 notas: lead.notas || '',
+                agent_id: lead.agent_id || user?.id
             });
         }
-    }, [lead]);
+    }, [lead, user]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -59,7 +62,7 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
             }
             onSave();
         } catch (err) {
-            setError('Error al guardar el lead. Inténtelo de nuevo.');
+            setError(`Error al guardar el lead: ${getErrorMessage(err)}`);
             console.error(err);
         } finally {
             setIsSaving(false);

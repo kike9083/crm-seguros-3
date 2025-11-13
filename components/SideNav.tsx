@@ -6,26 +6,28 @@ import ClipboardListIcon from './icons/ClipboardListIcon';
 import DocumentTextIcon from './icons/DocumentTextIcon';
 import CogIcon from './icons/CogIcon';
 import PresentationChartLineIcon from './icons/PresentationChartLineIcon';
+import { Profile } from '../types';
 
-type View = 'dashboard' | 'pipeline' | 'clients' | 'tasks' | 'policies' | 'products' | 'reports';
+type View = 'dashboard' | 'pipeline' | 'clients' | 'tasks' | 'policies' | 'settings' | 'reports';
 
 interface SideNavProps {
     currentView: View;
     setCurrentView: (view: View) => void;
+    profile: Profile;
 }
 
 const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: ChartBarIcon },
-    { id: 'pipeline', label: 'Pipeline', icon: ClipboardListIcon },
-    { id: 'clients', label: 'Clientes', icon: UserGroupIcon },
-    { id: 'tasks', label: 'Tareas', icon: ClipboardListIcon },
-    { id: 'policies', label: 'Pólizas', icon: DocumentTextIcon },
-    { id: 'products', label: 'Productos', icon: CogIcon },
-    { id: 'reports', label: 'Reportes', icon: PresentationChartLineIcon },
+    { id: 'dashboard', label: 'Dashboard', icon: ChartBarIcon, roles: ['ADMIN', 'AGENTE'] },
+    { id: 'pipeline', label: 'Pipeline', icon: ClipboardListIcon, roles: ['ADMIN', 'AGENTE'] },
+    { id: 'clients', label: 'Clientes', icon: UserGroupIcon, roles: ['ADMIN', 'AGENTE'] },
+    { id: 'tasks', label: 'Tareas', icon: ClipboardListIcon, roles: ['ADMIN', 'AGENTE'] },
+    { id: 'policies', label: 'Pólizas', icon: DocumentTextIcon, roles: ['ADMIN', 'AGENTE'] },
+    { id: 'reports', label: 'Reportes', icon: PresentationChartLineIcon, roles: ['ADMIN', 'AGENTE'] },
+    { id: 'settings', label: 'Configuración', icon: CogIcon, roles: ['ADMIN'] },
 ] as const;
 
 
-const SideNav: React.FC<SideNavProps> = ({ currentView, setCurrentView }) => {
+const SideNav: React.FC<SideNavProps> = ({ currentView, setCurrentView, profile }) => {
     return (
         <nav className="w-20 lg:w-64 bg-card p-2 lg:p-4 flex flex-col border-r border-border">
             <div className="flex items-center justify-center lg:justify-start mb-10">
@@ -35,7 +37,8 @@ const SideNav: React.FC<SideNavProps> = ({ currentView, setCurrentView }) => {
                 <h1 className="text-2xl font-bold ml-4 hidden lg:block">SeguroCRM</h1>
             </div>
             <ul className="space-y-2">
-                {navItems.map(item => (
+                {/* FIX: Cast item.roles to a broader type to satisfy the 'includes' method signature against profile.rol */}
+                {navItems.filter(item => (item.roles as readonly string[]).includes(profile.rol)).map(item => (
                     <li key={item.id}>
                         <button
                             onClick={() => setCurrentView(item.id)}
