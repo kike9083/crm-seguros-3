@@ -1,12 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getTasks, getErrorMessage } from '../services/api';
+import { getTasks, updateTask, getErrorMessage } from '../services/api';
 import { Task, TaskStatus } from '../types';
 import { TASK_STATUSES, STATUS_COLORS } from '../constants';
 import Spinner from './Spinner';
 import TaskModal from './TaskModal';
 import PlusIcon from './icons/PlusIcon';
 
-const TaskCard: React.FC<{ task: Task; onClick: () => void }> = ({ task, onClick }) => {
+const TaskCard: React.FC<{ 
+    task: Task; 
+    onClick: () => void;
+    onDragStart: (e: React.DragEvent<HTMLDivElement>, taskId: number) => void;
+    isDragging: boolean;
+}> = ({ task, onClick, onDragStart, isDragging }) => {
     const getRelatedName = (relation: { nombre: string } | { nombre: string }[] | null | undefined): string | null => {
         if (!relation) return null;
         if (Array.isArray(relation)) {
@@ -19,8 +24,11 @@ const TaskCard: React.FC<{ task: Task; onClick: () => void }> = ({ task, onClick
 
     return (
         <div
+            draggable
+            onDragStart={(e) => onDragStart(e, task.id)}
             onClick={onClick}
-            className="bg-secondary p-4 rounded-lg shadow-md cursor-pointer hover:bg-gray-600 transition-colors"
+            className={`bg-secondary p-4 rounded-lg shadow-md cursor-pointer hover:bg-gray-600 transition-all duration-200 ${isDragging ? 'opacity-50 scale-105' : 'opacity-100'}`}
+            aria-grabbed={isDragging}
         >
             <h3 className="font-bold text-text-primary">{task.descripcion}</h3>
             <p className="text-sm text-text-secondary mt-1">
@@ -40,18 +48,54 @@ const TaskColumn: React.FC<{
     status: TaskStatus;
     tasks: Task[];
     onCardClick: (task: Task) => void;
-}> = ({ status, tasks, onCardClick }) => {
+    onDrop: (e: React.DragEvent<HTMLDivElement>, status: TaskStatus) => void;
+    onDragStart: (e: React.DragEvent<HTMLDivElement>, taskId: number) => void;
+    draggedTaskId: number | null;
+}> = ({ status, tasks, onCardClick, onDrop, onDragStart, draggedTaskId }) => {
+    const [isDraggedOver, setIsDraggedOver] = useState(false);
     const statusColor = STATUS_COLORS[status] || 'bg-gray-500';
 
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault(); // Necesario para permitir el drop
+    };
+
+    const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setIsDraggedOver(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+        setIsDraggedOver(false);
+    };
+    
+    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        setIsDraggedOver(false);
+        onDrop(e, status);
+    };
+
     return (
-        <div className="bg-card w-72 md:w-80 flex-shrink-0 rounded-lg shadow-lg">
+        <div 
+            className={`bg-card w-72 md:w-80 flex-shrink-0 rounded-lg shadow-lg transition-colors duration-300 ${isDraggedOver ? 'bg-gray-700' : ''}`}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            aria-dropeffect="move"
+        >
             <div className={`p-3 rounded-t-lg flex justify-between items-center ${statusColor}`}>
                 <h2 className="font-bold text-white capitalize">{status}</h2>
                 <span className="text-sm font-semibold text-white bg-black bg-opacity-20 px-2 py-1 rounded-full">{tasks.length}</span>
             </div>
             <div className="p-3 space-y-3 overflow-y-auto h-[calc(100vh-18rem)]">
                 {tasks.map(task => (
-                    <TaskCard key={task.id} task={task} onClick={() => onCardClick(task)} />
+                    <TaskCard 
+                        key={task.id} 
+                        task={task} 
+                        onClick={() => onCardClick(task)}
+                        onDragStart={onDragStart}
+                        isDragging={draggedTaskId === task.id}
+                    />
                 ))}
             </div>
         </div>
@@ -65,6 +109,7 @@ const TasksBoard: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
 
     const fetchTasks = useCallback(async () => {
         try {
@@ -99,6 +144,48 @@ const TasksBoard: React.FC = () => {
         fetchTasks();
     };
 
+    const handleDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: number) => {
+        e.dataTransfer.setData('taskId', taskId.toString());
+        e.dataTransfer.effectAllowed = "move";
+        setDraggedTaskId(taskId);
+    };
+    
+    const handleDrop = async (e: React.DragEvent<HTMLDivElement>, newStatus: TaskStatus) => {
+        const taskIdStr = e.dataTransfer.getData('taskId');
+        if (!taskIdStr) return;
+        const taskId = parseInt(taskIdStr, 10);
+        setDraggedTaskId(null);
+        
+        const taskToMove = tasks.find(t => t.id === taskId);
+        if (!taskToMove || taskToMove.estatus === newStatus) {
+            return; // No hay cambios o la tarea no se encontró
+        }
+
+        // Actualización optimista de la UI
+        const originalTasks = [...tasks];
+        const updatedTasks = tasks.map(t => 
+            t.id === taskId ? { ...t, estatus: newStatus } : t
+        );
+        setTasks(updatedTasks);
+
+        try {
+            // Llamada a la API para persistir el cambio
+            const { leads, clients, ...taskDataForUpdate } = taskToMove;
+            
+            await updateTask(taskId, {
+                ...taskDataForUpdate,
+                estatus: newStatus,
+            });
+            
+        } catch (err) {
+            // Revertir la UI en caso de error
+            setTasks(originalTasks);
+            setError(`Error al actualizar la tarea: ${getErrorMessage(err)}`);
+            console.error(err);
+            alert(`No se pudo mover la tarea. Error: ${getErrorMessage(err)}`);
+        }
+    };
+
     if (loading) return <div className="flex justify-center items-center h-full"><Spinner /></div>;
     if (error) return <p className="text-red-500 text-center">{error}</p>;
 
@@ -120,6 +207,9 @@ const TasksBoard: React.FC = () => {
                         status={status}
                         tasks={tasks.filter(task => task.estatus === status)}
                         onCardClick={handleOpenModal}
+                        onDrop={handleDrop}
+                        onDragStart={handleDragStart}
+                        draggedTaskId={draggedTaskId}
                     />
                 ))}
             </div>

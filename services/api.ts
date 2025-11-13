@@ -334,12 +334,6 @@ export const getDashboardStats = async () => {
     return data as { leads: number; tasks: number; policies: number; commissions: number };
 };
 
-export const getUpcomingTasks = async () => {
-    const { data, error } = await supabase.rpc('get_upcoming_tasks_for_user');
-    if (error) throw error;
-    return data as unknown as Task[];
-};
-
 export const getLeadsByStatus = async () => {
     const { data, error } = await supabase.rpc('get_leads_by_status_for_user');
     if (error) throw error;

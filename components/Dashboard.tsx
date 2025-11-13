@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect } from 'react';
-import { getDashboardStats, getUpcomingTasks, getLeadsByStatus, getErrorMessage } from '../services/api';
+import { getDashboardStats, getTasks, getLeadsByStatus, getErrorMessage } from '../services/api';
 import { Task } from '../types';
 import { LEAD_STATUSES, STATUS_COLORS } from '../constants';
 import Spinner from './Spinner';
@@ -102,13 +103,19 @@ const Dashboard: React.FC = () => {
             try {
                 setLoading(true);
                 setError(null);
-                const [statsData, tasksData, pipelineCounts] = await Promise.all([
+                const [statsData, allTasks, pipelineCounts] = await Promise.all([
                     getDashboardStats(),
-                    getUpcomingTasks(),
+                    getTasks(),
                     getLeadsByStatus()
                 ]);
                 setStats(statsData);
-                setUpcomingTasks(tasksData);
+                
+                const upcoming = allTasks
+                    .filter(task => task.estatus === 'PENDIENTE')
+                    .sort((a, b) => new Date(a.fecha_vencimiento).getTime() - new Date(b.fecha_vencimiento).getTime())
+                    .slice(0, 5);
+                setUpcomingTasks(upcoming);
+
                 setPipelineData(pipelineCounts);
             } catch (err) {
                 setError(`No se pudieron cargar los datos del dashboard: ${getErrorMessage(err)}`);
