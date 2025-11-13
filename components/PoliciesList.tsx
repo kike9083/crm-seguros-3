@@ -1,16 +1,22 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
-import { getPolicies, getErrorMessage } from '../services/api';
+import { getPolicies, deletePolicy, getErrorMessage } from '../services/api';
 import { Policy } from '../types';
 import Spinner from './Spinner';
 import PlusIcon from './icons/PlusIcon';
 import PolicyModal from './PolicyModal';
+import ConfirmationModal from './ConfirmationModal';
+import { useAuth } from './auth/AuthContext';
 
 const PoliciesList: React.FC = () => {
+    const { profile } = useAuth();
     const [policies, setPolicies] = useState<Policy[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+    const [policyToDelete, setPolicyToDelete] = useState<Policy | null>(null);
 
     const fetchPolicies = useCallback(async () => {
         try {
@@ -43,6 +49,29 @@ const PoliciesList: React.FC = () => {
     const handleSave = () => {
         handleCloseModal();
         fetchPolicies();
+    };
+
+    const handleDeleteRequest = (policy: Policy) => {
+        setPolicyToDelete(policy);
+        setIsConfirmModalOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!policyToDelete) return;
+        try {
+            await deletePolicy(policyToDelete.id);
+            fetchPolicies();
+        } catch (err) {
+            alert(`No se pudo eliminar la póliza: ${getErrorMessage(err)}`);
+        } finally {
+            setIsConfirmModalOpen(false);
+            setPolicyToDelete(null);
+        }
+    };
+
+    const handleCancelDelete = () => {
+        setIsConfirmModalOpen(false);
+        setPolicyToDelete(null);
     };
 
     const getStatusColor = (status: string) => {
@@ -104,8 +133,11 @@ const PoliciesList: React.FC = () => {
                                             {policy.estatus_poliza}
                                         </span>
                                     </td>
-                                    <td className="p-4">
+                                    <td className="p-4 space-x-2 whitespace-nowrap">
                                         <button onClick={() => handleOpenModal(policy)} className="text-accent hover:underline">Editar</button>
+                                        {profile?.rol === 'ADMIN' && (
+                                            <button onClick={() => handleDeleteRequest(policy)} className="text-red-500 hover:underline">Eliminar</button>
+                                        )}
                                     </td>
                                 </tr>
                             ))}
@@ -123,6 +155,14 @@ const PoliciesList: React.FC = () => {
                     onSave={handleSave}
                 />
             )}
+            <ConfirmationModal
+                isOpen={isConfirmModalOpen}
+                title="Confirmar Eliminación de Póliza"
+                message={`¿Estás seguro de que quieres eliminar la póliza para "${getRelatedName(policyToDelete?.clients)}"? Esta acción no se puede deshacer.`}
+                onConfirm={handleConfirmDelete}
+                onCancel={handleCancelDelete}
+                confirmText="Eliminar"
+            />
         </>
     );
 };

@@ -139,6 +139,12 @@ export const updateLead = async (id: number, updates: Omit<Lead, 'id' | 'created
     return data as Lead;
 };
 
+export const deleteLead = async (id: number) => {
+    // Assuming an RPC function `delete_lead_secure` exists that handles permissions.
+    const { error } = await supabase.rpc('delete_lead_secure', { p_id: id });
+    if (error) throw error;
+};
+
 export const promoteLeadToClient = async (leadId: number) => {
     // FIX: Use the correct, simplified RPC call syntax.
     // The corrected DB script ensures only one function signature exists, removing ambiguity.
@@ -164,6 +170,12 @@ export const updateClient = async (id: number, updates: Omit<Client, 'id' | 'cre
     }).single();
     if (error) throw error;
     return data as Client;
+};
+
+export const deleteClient = async (id: number) => {
+    // Assuming an RPC function `delete_client_secure` exists that handles permissions.
+    const { error } = await supabase.rpc('delete_client_secure', { p_id: id });
+    if (error) throw error;
 };
 
 // Policies
@@ -198,6 +210,12 @@ export const updatePolicy = async (id: number, updates: Omit<Policy, 'id' | 'cre
     }).single();
     if (error) throw error;
     return data as Policy;
+};
+
+export const deletePolicy = async (id: number) => {
+    // Assuming an RPC function `delete_policy_secure` exists that handles permissions.
+    const { error } = await supabase.rpc('delete_policy_secure', { p_id: id });
+    if (error) throw error;
 };
 
 // Storage
@@ -301,6 +319,12 @@ export const updateTask = async (id: number, updates: Omit<Task, 'id' | 'created
     }).single();
     if (error) throw error;
     return data as Task;
+};
+
+export const deleteTask = async (id: number) => {
+    // Assuming an RPC function `delete_task_secure` exists that handles permissions.
+    const { error } = await supabase.rpc('delete_task_secure', { p_id: id });
+    if (error) throw error;
 };
 
 // Dashboard

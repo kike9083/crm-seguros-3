@@ -1,15 +1,21 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
-import { getClients, getErrorMessage } from '../services/api';
+import { getClients, deleteClient, getErrorMessage } from '../services/api';
 import { Client } from '../types';
 import Spinner from './Spinner';
 import ClientModal from './ClientModal';
+import ConfirmationModal from './ConfirmationModal';
+import { useAuth } from './auth/AuthContext';
 
 const ClientsList: React.FC = () => {
+    const { profile } = useAuth();
     const [clients, setClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedClient, setSelectedClient] = useState<Client | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+    const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
 
     const fetchClients = useCallback(async () => {
         try {
@@ -44,6 +50,29 @@ const ClientsList: React.FC = () => {
         fetchClients();
     };
 
+    const handleDeleteRequest = (client: Client) => {
+        setClientToDelete(client);
+        setIsConfirmModalOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!clientToDelete) return;
+        try {
+            await deleteClient(clientToDelete.id);
+            fetchClients();
+        } catch (err) {
+            alert(`No se pudo eliminar el cliente: ${getErrorMessage(err)}`);
+        } finally {
+            setIsConfirmModalOpen(false);
+            setClientToDelete(null);
+        }
+    };
+
+    const handleCancelDelete = () => {
+        setIsConfirmModalOpen(false);
+        setClientToDelete(null);
+    };
+
 
     if (loading) return <div className="flex justify-center items-center h-full"><Spinner /></div>;
     if (error) return <p className="text-red-500 text-center">{error}</p>;
@@ -69,8 +98,11 @@ const ClientsList: React.FC = () => {
                                     <td className="p-4 text-text-secondary">{client.email}</td>
                                     <td className="p-4 text-text-secondary">{client.telefono}</td>
                                     <td className="p-4 text-text-secondary">{new Date(client.created_at).toLocaleDateString()}</td>
-                                    <td className="p-4">
+                                    <td className="p-4 space-x-2 whitespace-nowrap">
                                         <button onClick={() => handleOpenModal(client)} className="text-accent hover:underline">Editar</button>
+                                        {profile?.rol === 'ADMIN' && (
+                                            <button onClick={() => handleDeleteRequest(client)} className="text-red-500 hover:underline">Eliminar</button>
+                                        )}
                                     </td>
                                 </tr>
                             ))}
@@ -88,6 +120,14 @@ const ClientsList: React.FC = () => {
                     onSave={handleSave}
                 />
             )}
+            <ConfirmationModal
+                isOpen={isConfirmModalOpen}
+                title="Confirmar Eliminación de Cliente"
+                message={`¿Estás seguro de que quieres eliminar a "${clientToDelete?.nombre}"? Esta acción no se puede deshacer y podría afectar a las pólizas asociadas.`}
+                onConfirm={handleConfirmDelete}
+                onCancel={handleCancelDelete}
+                confirmText="Eliminar"
+            />
         </>
     );
 };

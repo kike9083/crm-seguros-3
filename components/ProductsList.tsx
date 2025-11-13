@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getProducts, deleteProduct, getErrorMessage } from '../services/api';
 import { Product } from '../types';
 import Spinner from './Spinner';
 import PlusIcon from './icons/PlusIcon';
 import ProductModal from './ProductModal';
+import ConfirmationModal from './ConfirmationModal';
 
 const ProductsList: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
@@ -11,6 +12,9 @@ const ProductsList: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+    const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
 
     const fetchProducts = useCallback(async () => {
         try {
@@ -30,6 +34,16 @@ const ProductsList: React.FC = () => {
         fetchProducts();
     }, [fetchProducts]);
 
+    const filteredProducts = useMemo(() => {
+        if (!searchTerm) {
+            return products;
+        }
+        return products.filter(product =>
+            product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            product.aseguradora.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    }, [products, searchTerm]);
+
     const handleOpenModal = (product: Product | null) => {
         setSelectedProduct(product);
         setIsModalOpen(true);
@@ -45,16 +59,28 @@ const ProductsList: React.FC = () => {
         fetchProducts();
     };
 
-    const handleDelete = async (id: number) => {
-        if (window.confirm('¿Estás seguro de que quieres eliminar este producto?')) {
-            try {
-                await deleteProduct(id);
-                fetchProducts();
-            } catch (err) {
-                alert(`No se pudo eliminar el producto: ${getErrorMessage(err)}`);
-                console.error(err);
-            }
+    const handleDeleteRequest = (product: Product) => {
+        setProductToDelete(product);
+        setIsConfirmModalOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!productToDelete) return;
+        try {
+            await deleteProduct(productToDelete.id);
+            fetchProducts();
+        } catch (err) {
+            alert(`No se pudo eliminar el producto: ${getErrorMessage(err)}`);
+            console.error(err);
+        } finally {
+            setIsConfirmModalOpen(false);
+            setProductToDelete(null);
         }
+    };
+
+    const handleCancelDelete = () => {
+        setIsConfirmModalOpen(false);
+        setProductToDelete(null);
     };
 
     if (loading) return <div className="flex justify-center items-center h-full"><Spinner /></div>;
@@ -62,7 +88,22 @@ const ProductsList: React.FC = () => {
 
     return (
         <>
-            <div className="flex justify-end mb-4">
+            <div className="flex justify-between items-center mb-4">
+                <div className="relative w-full max-w-xs">
+                    <input
+                        type="text"
+                        placeholder="Buscar por nombre o aseguradora..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full bg-secondary p-2 pl-10 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary"
+                        aria-label="Buscar productos"
+                    />
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-text-secondary">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                        </svg>
+                    </div>
+                </div>
                 <button
                     onClick={() => handleOpenModal(null)}
                     className="flex items-center bg-primary hover:bg-accent text-white font-bold py-2 px-4 rounded-lg transition-colors"
@@ -85,7 +126,7 @@ const ProductsList: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {products.map(product => (
+                            {filteredProducts.map(product => (
                                 <tr key={product.id} className="border-b border-border hover:bg-secondary">
                                     <td className="p-4 font-medium">{product.nombre}</td>
                                     <td className="p-4 text-text-secondary">{product.aseguradora}</td>
@@ -98,14 +139,19 @@ const ProductsList: React.FC = () => {
                                     </td>
                                     <td className="p-4 space-x-2">
                                         <button onClick={() => handleOpenModal(product)} className="text-accent hover:underline">Editar</button>
-                                        <button onClick={() => handleDelete(product.id)} className="text-red-500 hover:underline">Eliminar</button>
+                                        <button onClick={() => handleDeleteRequest(product)} className="text-red-500 hover:underline">Eliminar</button>
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
-                    {products.length === 0 && (
-                        <p className="text-center p-8 text-text-secondary">No se encontraron productos. Añade tu primer producto para empezar.</p>
+                    {filteredProducts.length === 0 && (
+                        <p className="text-center p-8 text-text-secondary">
+                            {searchTerm 
+                                ? `No se encontraron productos para "${searchTerm}".`
+                                : 'No se encontraron productos. Añade tu primer producto para empezar.'
+                            }
+                        </p>
                     )}
                 </div>
             </div>
@@ -116,6 +162,14 @@ const ProductsList: React.FC = () => {
                     onSave={handleSave}
                 />
             )}
+            <ConfirmationModal
+                isOpen={isConfirmModalOpen}
+                title="Confirmar Eliminación"
+                message={`¿Estás seguro de que quieres eliminar el producto "${productToDelete?.nombre}"? Esta acción no se puede deshacer.`}
+                onConfirm={handleConfirmDelete}
+                onCancel={handleCancelDelete}
+                confirmText="Eliminar"
+            />
         </>
     );
 };

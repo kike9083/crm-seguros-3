@@ -1,8 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
-import { createLead, updateLead, promoteLeadToClient, getErrorMessage } from '../services/api';
+import { createLead, updateLead, promoteLeadToClient, deleteLead, getErrorMessage } from '../services/api';
 import { Lead, LeadStatus } from '../types';
 import { LEAD_STATUSES } from '../constants';
 import { useAuth } from './auth/AuthContext';
+import ConfirmationModal from './ConfirmationModal';
 
 interface LeadModalProps {
     lead: Lead | null;
@@ -11,7 +13,7 @@ interface LeadModalProps {
 }
 
 const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
-    const { user } = useAuth();
+    const { user, profile } = useAuth();
     const [formData, setFormData] = useState({
         nombre: '',
         email: '',
@@ -23,6 +25,7 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
     });
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
     useEffect(() => {
         if (lead) {
@@ -68,55 +71,91 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
             setIsSaving(false);
         }
     };
+
+    const handleDelete = async () => {
+        if (!lead) return;
+        try {
+            await deleteLead(lead.id);
+            onSave(); // Close modal and refresh list
+        } catch (err) {
+            setError(`Error al eliminar el lead: ${getErrorMessage(err)}`);
+        } finally {
+            setIsConfirmModalOpen(false);
+        }
+    };
     
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
-            <div className="bg-card rounded-lg shadow-2xl p-8 w-full max-w-lg">
-                <h2 className="text-2xl font-bold mb-6">{lead ? 'Editar Lead' : 'Nuevo Lead'}</h2>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <label htmlFor="nombre" className="block text-sm font-medium text-text-secondary mb-1">Nombre Completo</label>
-                            <input id="nombre" name="nombre" value={formData.nombre} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required />
+        <>
+            <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
+                <div className="bg-card rounded-lg shadow-2xl p-8 w-full max-w-lg">
+                    <h2 className="text-2xl font-bold mb-6">{lead ? 'Editar Lead' : 'Nuevo Lead'}</h2>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label htmlFor="nombre" className="block text-sm font-medium text-text-secondary mb-1">Nombre Completo</label>
+                                <input id="nombre" name="nombre" value={formData.nombre} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required />
+                            </div>
+                            <div>
+                                <label htmlFor="email" className="block text-sm font-medium text-text-secondary mb-1">Email</label>
+                                <input id="email" name="email" value={formData.email} onChange={handleChange} type="email" className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required />
+                            </div>
+                            <div>
+                                <label htmlFor="telefono" className="block text-sm font-medium text-text-secondary mb-1">Teléfono</label>
+                                <input id="telefono" name="telefono" value={formData.telefono} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
+                            </div>
+                            <div>
+                                <label htmlFor="fuente" className="block text-sm font-medium text-text-secondary mb-1">Fuente</label>
+                                <select id="fuente" name="fuente" value={formData.fuente} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary">
+                                    <option>Web</option>
+                                    <option>Referido</option>
+                                    <option>Llamada en frío</option>
+                                    <option>Evento</option>
+                                </select>
+                            </div>
                         </div>
                         <div>
-                             <label htmlFor="email" className="block text-sm font-medium text-text-secondary mb-1">Email</label>
-                            <input id="email" name="email" value={formData.email} onChange={handleChange} type="email" className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required />
-                        </div>
-                        <div>
-                            <label htmlFor="telefono" className="block text-sm font-medium text-text-secondary mb-1">Teléfono</label>
-                            <input id="telefono" name="telefono" value={formData.telefono} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
-                        </div>
-                        <div>
-                            <label htmlFor="fuente" className="block text-sm font-medium text-text-secondary mb-1">Fuente</label>
-                            <select id="fuente" name="fuente" value={formData.fuente} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary">
-                                <option>Web</option>
-                                <option>Referido</option>
-                                <option>Llamada en frío</option>
-                                <option>Evento</option>
+                            <label htmlFor="estatus_lead" className="block text-sm font-medium text-text-secondary mb-1">Estatus</label>
+                            <select id="estatus_lead" name="estatus_lead" value={formData.estatus_lead} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary">
+                                {LEAD_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
                             </select>
                         </div>
-                    </div>
-                    <div>
-                        <label htmlFor="estatus_lead" className="block text-sm font-medium text-text-secondary mb-1">Estatus</label>
-                        <select id="estatus_lead" name="estatus_lead" value={formData.estatus_lead} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary">
-                            {LEAD_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
-                        </select>
-                    </div>
-                    <div>
-                       <label htmlFor="notas" className="block text-sm font-medium text-text-secondary mb-1">Notas</label>
-                       <textarea id="notas" name="notas" value={formData.notas} onChange={handleChange} rows={3} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary"></textarea>
-                    </div>
-                    {error && <p className="text-red-500 mt-4 text-sm">{error}</p>}
-                    <div className="mt-6 flex justify-end space-x-4">
-                        <button type="button" onClick={onClose} className="bg-secondary hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition-colors" disabled={isSaving}>Cancelar</button>
-                        <button type="submit" className="bg-primary hover:bg-accent text-white font-bold py-2 px-4 rounded transition-colors" disabled={isSaving}>
-                            {isSaving ? 'Guardando...' : 'Guardar'}
-                        </button>
-                    </div>
-                </form>
+                        <div>
+                        <label htmlFor="notas" className="block text-sm font-medium text-text-secondary mb-1">Notas</label>
+                        <textarea id="notas" name="notas" value={formData.notas} onChange={handleChange} rows={3} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary"></textarea>
+                        </div>
+                        {error && <p className="text-red-500 mt-4 text-sm">{error}</p>}
+                        <div className="mt-6 flex justify-between items-center">
+                            <div>
+                                {lead && profile?.rol === 'ADMIN' && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsConfirmModalOpen(true)}
+                                        className="text-red-500 hover:underline"
+                                        disabled={isSaving}
+                                    >
+                                        Eliminar Lead
+                                    </button>
+                                )}
+                            </div>
+                            <div className="flex space-x-4">
+                                <button type="button" onClick={onClose} className="bg-secondary hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition-colors" disabled={isSaving}>Cancelar</button>
+                                <button type="submit" className="bg-primary hover:bg-accent text-white font-bold py-2 px-4 rounded transition-colors" disabled={isSaving}>
+                                    {isSaving ? 'Guardando...' : 'Guardar'}
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
             </div>
-        </div>
+            <ConfirmationModal
+                isOpen={isConfirmModalOpen}
+                title="Confirmar Eliminación de Lead"
+                message={`¿Estás seguro de que quieres eliminar a "${lead?.nombre}"? Esta acción no se puede deshacer.`}
+                onConfirm={handleDelete}
+                onCancel={() => setIsConfirmModalOpen(false)}
+                confirmText="Eliminar"
+            />
+        </>
     );
 };
 

@@ -1,8 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
-import { createTask, updateTask, getLeads, getClients, getErrorMessage } from '../services/api';
+import { createTask, updateTask, getLeads, getClients, deleteTask, getErrorMessage } from '../services/api';
 import { Task, TaskStatus, Lead, Client } from '../types';
 import { TASK_STATUSES } from '../constants';
 import { useAuth } from './auth/AuthContext';
+import ConfirmationModal from './ConfirmationModal';
 
 interface TaskModalProps {
     task: Task | null;
@@ -11,7 +13,7 @@ interface TaskModalProps {
 }
 
 const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onSave }) => {
-    const { user } = useAuth();
+    const { user, profile } = useAuth();
     const [formData, setFormData] = useState({
         descripcion: '',
         tipo: 'LLAMADA' as 'LLAMADA' | 'EMAIL' | 'CITA' | 'WHATSAPP',
@@ -26,16 +28,14 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onSave }) => {
     const [clients, setClients] = useState<Client[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
             try {
                 const [leadsData, clientsData] = await Promise.all([getLeads(), getClients()]);
                 
-                // Obtener un conjunto de IDs de leads que ya han sido convertidos a clientes.
                 const convertedLeadIds = new Set(clientsData.map(c => c.lead_origen_id).filter(id => id != null));
-                
-                // Filtrar la lista de leads para excluir aquellos que ya son clientes.
                 const filteredLeads = leadsData.filter(lead => !convertedLeadIds.has(lead.id));
 
                 setLeads(filteredLeads);
@@ -101,75 +101,111 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onSave }) => {
             setIsSaving(false);
         }
     };
+
+    const handleDelete = async () => {
+        if (!task) return;
+        try {
+            await deleteTask(task.id);
+            onSave();
+        } catch (err) {
+            setError(`Error al eliminar la tarea: ${getErrorMessage(err)}`);
+        } finally {
+            setIsConfirmModalOpen(false);
+        }
+    };
     
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
-            <div className="bg-card rounded-lg shadow-2xl p-8 w-full max-w-lg">
-                <h2 className="text-2xl font-bold mb-6">{task ? 'Editar Tarea' : 'Nueva Tarea'}</h2>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label htmlFor="descripcion" className="block text-sm font-medium text-text-secondary mb-1">Descripción</label>
-                        <textarea id="descripcion" name="descripcion" value={formData.descripcion} onChange={handleChange} rows={3} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required></textarea>
-                    </div>
-                    
-                    <div>
-                        <label htmlFor="contacto" className="block text-sm font-medium text-text-secondary mb-1">Asociar con</label>
-                        <select
-                            id="contacto"
-                            value={formData.lead_id ? `lead-${formData.lead_id}` : formData.client_id ? `client-${formData.client_id}` : ''}
-                            onChange={handleContactChange}
-                            className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary"
-                        >
-                            <option value="">Seleccione un Lead o Cliente...</option>
-                            <optgroup label="Leads">
-                                {leads.map(l => <option key={`lead-${l.id}`} value={`lead-${l.id}`}>{l.nombre}</option>)}
-                            </optgroup>
-                            <optgroup label="Clientes">
-                                {clients.map(c => <option key={`client-${c.id}`} value={`client-${c.id}`}>{c.nombre}</option>)}
-                            </optgroup>
-                        </select>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <>
+            <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
+                <div className="bg-card rounded-lg shadow-2xl p-8 w-full max-w-lg">
+                    <h2 className="text-2xl font-bold mb-6">{task ? 'Editar Tarea' : 'Nueva Tarea'}</h2>
+                    <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
-                            <label htmlFor="fecha_vencimiento" className="block text-sm font-medium text-text-secondary mb-1">Fecha de Vencimiento</label>
-                            <input id="fecha_vencimiento" type="date" name="fecha_vencimiento" value={formData.fecha_vencimiento} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required/>
+                            <label htmlFor="descripcion" className="block text-sm font-medium text-text-secondary mb-1">Descripción</label>
+                            <textarea id="descripcion" name="descripcion" value={formData.descripcion} onChange={handleChange} rows={3} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required></textarea>
                         </div>
+                        
                         <div>
-                            <label htmlFor="tipo" className="block text-sm font-medium text-text-secondary mb-1">Tipo de Contacto</label>
-                            <select id="tipo" name="tipo" value={formData.tipo} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary">
-                                <option>LLAMADA</option>
-                                <option>EMAIL</option>
-                                <option>CITA</option>
-                                <option>WHATSAPP</option>
+                            <label htmlFor="contacto" className="block text-sm font-medium text-text-secondary mb-1">Asociar con</label>
+                            <select
+                                id="contacto"
+                                value={formData.lead_id ? `lead-${formData.lead_id}` : formData.client_id ? `client-${formData.client_id}` : ''}
+                                onChange={handleContactChange}
+                                className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary"
+                            >
+                                <option value="">Seleccione un Lead o Cliente...</option>
+                                <optgroup label="Leads">
+                                    {leads.map(l => <option key={`lead-${l.id}`} value={`lead-${l.id}`}>{l.nombre}</option>)}
+                                </optgroup>
+                                <optgroup label="Clientes">
+                                    {clients.map(c => <option key={`client-${c.id}`} value={`client-${c.id}`}>{c.nombre}</option>)}
+                                </optgroup>
                             </select>
                         </div>
-                        <div>
-                            <label htmlFor="prioridad" className="block text-sm font-medium text-text-secondary mb-1">Prioridad</label>
-                            <select id="prioridad" name="prioridad" value={formData.prioridad} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary">
-                                <option value="BAJA">Baja</option>
-                                <option value="MEDIA">Media</option>
-                                <option value="ALTA">Alta</option>
-                            </select>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label htmlFor="fecha_vencimiento" className="block text-sm font-medium text-text-secondary mb-1">Fecha de Vencimiento</label>
+                                <input id="fecha_vencimiento" type="date" name="fecha_vencimiento" value={formData.fecha_vencimiento} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required/>
+                            </div>
+                            <div>
+                                <label htmlFor="tipo" className="block text-sm font-medium text-text-secondary mb-1">Tipo de Contacto</label>
+                                <select id="tipo" name="tipo" value={formData.tipo} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary">
+                                    <option>LLAMADA</option>
+                                    <option>EMAIL</option>
+                                    <option>CITA</option>
+                                    <option>WHATSAPP</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label htmlFor="prioridad" className="block text-sm font-medium text-text-secondary mb-1">Prioridad</label>
+                                <select id="prioridad" name="prioridad" value={formData.prioridad} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary">
+                                    <option value="BAJA">Baja</option>
+                                    <option value="MEDIA">Media</option>
+                                    <option value="ALTA">Alta</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label htmlFor="estatus" className="block text-sm font-medium text-text-secondary mb-1">Estatus</label>
+                                <select id="estatus" name="estatus" value={formData.estatus} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary">
+                                    {TASK_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
+                                </select>
+                            </div>
                         </div>
-                        <div>
-                            <label htmlFor="estatus" className="block text-sm font-medium text-text-secondary mb-1">Estatus</label>
-                            <select id="estatus" name="estatus" value={formData.estatus} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary">
-                                {TASK_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
-                            </select>
-                        </div>
-                    </div>
 
-                    {error && <p className="text-red-500 mt-4 text-sm">{error}</p>}
-                    <div className="mt-6 flex justify-end space-x-4">
-                        <button type="button" onClick={onClose} className="bg-secondary hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition-colors" disabled={isSaving}>Cancelar</button>
-                        <button type="submit" className="bg-primary hover:bg-accent text-white font-bold py-2 px-4 rounded transition-colors" disabled={isSaving}>
-                            {isSaving ? 'Guardando...' : 'Guardar'}
-                        </button>
-                    </div>
-                </form>
+                        {error && <p className="text-red-500 mt-4 text-sm">{error}</p>}
+                        <div className="mt-6 flex justify-between items-center">
+                            <div>
+                                {task && profile?.rol === 'ADMIN' && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsConfirmModalOpen(true)}
+                                        className="text-red-500 hover:underline"
+                                        disabled={isSaving}
+                                    >
+                                        Eliminar Tarea
+                                    </button>
+                                )}
+                            </div>
+                            <div className="flex space-x-4">
+                                <button type="button" onClick={onClose} className="bg-secondary hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition-colors" disabled={isSaving}>Cancelar</button>
+                                <button type="submit" className="bg-primary hover:bg-accent text-white font-bold py-2 px-4 rounded transition-colors" disabled={isSaving}>
+                                    {isSaving ? 'Guardando...' : 'Guardar'}
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
             </div>
-        </div>
+            <ConfirmationModal
+                isOpen={isConfirmModalOpen}
+                title="Confirmar Eliminación de Tarea"
+                message={`¿Estás seguro de que quieres eliminar esta tarea? Esta acción no se puede deshacer.`}
+                onConfirm={handleDelete}
+                onCancel={() => setIsConfirmModalOpen(false)}
+                confirmText="Eliminar"
+            />
+        </>
     );
 };
 
