@@ -161,8 +161,8 @@ export const promoteLeadToClient = async (leadId: number) => {
 };
 
 // Clients
-export const getClients = async () => {
-    const { data, error } = await supabase.rpc('get_clients_for_user');
+export const getClients = async (searchTerm?: string) => {
+    const { data, error } = await supabase.rpc('get_clients_for_user', { p_search_term: searchTerm || '' });
     if (error) throw error;
     return data as Client[];
 };
@@ -185,8 +185,8 @@ export const deleteClient = async (id: number) => {
 };
 
 // Policies
-export const getPolicies = async () => {
-    const { data, error } = await supabase.rpc('get_policies_for_user');
+export const getPolicies = async (searchTerm?: string) => {
+    const { data, error } = await supabase.rpc('get_policies_for_user', { p_search_term: searchTerm || '' });
     if (error) throw error;
     return data as unknown as Policy[];
 };
