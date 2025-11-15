@@ -246,6 +246,12 @@ export const createSignedUrl = async (bucket: string, path: string): Promise<str
     return data.signedUrl;
 };
 
+export const deleteFile = async (bucket: string, path: string) => {
+    const { data, error } = await supabase.storage.from(bucket).remove([path]);
+    if (error) throw error;
+    return data;
+};
+
 
 // Products
 export const getProducts = async () => {

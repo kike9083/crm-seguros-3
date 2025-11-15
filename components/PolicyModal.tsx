@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { createPolicy, updatePolicy, getClients, getProducts, getFiles, uploadFile, createSignedUrl, getErrorMessage } from '../services/api';
+import { createPolicy, updatePolicy, getClients, getProducts, getFiles, uploadFile, createSignedUrl, getErrorMessage, deleteFile } from '../services/api';
 import { Client, Product, Policy, PolicyStatus, FileObject } from '../types';
 import { useAuth } from './auth/AuthContext';
 import Spinner from './Spinner';
 import PlusIcon from './icons/PlusIcon';
 import ArrowDownTrayIcon from './icons/ArrowDownTrayIcon';
+import TrashIcon from './icons/TrashIcon';
+import ConfirmationModal from './ConfirmationModal';
 
 interface PolicyModalProps {
     policy: Policy | null;
@@ -34,6 +36,10 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
     const [fileError, setFileError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
+    const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+    const [fileToDelete, setFileToDelete] = useState<FileObject | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+
 
     const fetchFiles = useCallback(async () => {
         if (!policy) return;
@@ -129,6 +135,28 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
         }
     };
 
+    const handleDeleteRequest = (file: FileObject) => {
+        setFileToDelete(file);
+        setIsConfirmDeleteOpen(true);
+    };
+
+    const handleConfirmDelete = async () => {
+        if (!fileToDelete || !policy) return;
+        setIsDeleting(true);
+        setFileError(null);
+        try {
+            const path = `${policy.id}/${fileToDelete.name}`;
+            await deleteFile('policy_files', path);
+            await fetchFiles();
+        } catch (err) {
+            setFileError(`Error al eliminar el archivo: ${getErrorMessage(err)}`);
+        } finally {
+            setIsDeleting(false);
+            setIsConfirmDeleteOpen(false);
+            setFileToDelete(null);
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.client_id || !formData.product_id) {
@@ -166,120 +194,140 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
     };
     
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
-            <div className="bg-card rounded-lg shadow-2xl p-8 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-                <h2 className="text-2xl font-bold mb-6">{policy ? 'Editar Póliza' : 'Crear Nueva Póliza'}</h2>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label htmlFor="client_id" className="block text-sm font-medium text-text-secondary mb-1">Cliente</label>
-                        <select id="client_id" name="client_id" value={formData.client_id} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required>
-                            <option value="">Seleccione un Cliente</option>
-                            {clients.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                        </select>
-                    </div>
-                    <div>
-                        <label htmlFor="product_id" className="block text-sm font-medium text-text-secondary mb-1">Producto</label>
-                        <select id="product_id" name="product_id" value={formData.product_id} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required>
-                            <option value="">Seleccione un Producto</option>
-                             {products.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label htmlFor="prima_total" className="block text-sm font-medium text-text-secondary mb-1">Prima Total Anual ($)</label>
-                        <input id="prima_total" type="number" step="0.01" name="prima_total" value={formData.prima_total} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required/>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                         <div>
-                            <label htmlFor="fecha_emision" className="block text-sm font-medium text-text-secondary mb-1">Fecha de Emisión</label>
-                            <input id="fecha_emision" type="date" name="fecha_emision" value={formData.fecha_emision} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required/>
+        <>
+            <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
+                <div className="bg-card rounded-lg shadow-2xl p-8 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                    <h2 className="text-2xl font-bold mb-6">{policy ? 'Editar Póliza' : 'Crear Nueva Póliza'}</h2>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div>
+                            <label htmlFor="client_id" className="block text-sm font-medium text-text-secondary mb-1">Cliente</label>
+                            <select id="client_id" name="client_id" value={formData.client_id} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required>
+                                <option value="">Seleccione un Cliente</option>
+                                {clients.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                            </select>
                         </div>
                         <div>
-                            <label htmlFor="fecha_vencimiento" className="block text-sm font-medium text-text-secondary mb-1">Fecha de Vencimiento</label>
-                            <input id="fecha_vencimiento" type="date" name="fecha_vencimiento" value={formData.fecha_vencimiento} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required/>
+                            <label htmlFor="product_id" className="block text-sm font-medium text-text-secondary mb-1">Producto</label>
+                            <select id="product_id" name="product_id" value={formData.product_id} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required>
+                                <option value="">Seleccione un Producto</option>
+                                 {products.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                            </select>
                         </div>
-                    </div>
-                    <div>
-                        <label htmlFor="estatus_poliza" className="block text-sm font-medium text-text-secondary mb-1">Estatus de la Póliza</label>
-                        <select id="estatus_poliza" name="estatus_poliza" value={formData.estatus_poliza} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary">
-                            <option value="ACTIVA">Activa</option>
-                            <option value="PENDIENTE PAGO">Pendiente Pago</option>
-                            <option value="CANCELADA">Cancelada</option>
-                             <option value="VENCIDA">Vencida</option>
-                        </select>
-                    </div>
+                        
+                        <div>
+                            <label htmlFor="prima_total" className="block text-sm font-medium text-text-secondary mb-1">Prima Total Anual ($)</label>
+                            <input id="prima_total" type="number" step="0.01" name="prima_total" value={formData.prima_total} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required/>
+                        </div>
 
-                    {error && <p className="text-red-500 mt-4 text-sm">{error}</p>}
-
-                    {policy && (
-                         <div className="mt-6 border-t border-border pt-4">
-                            <h3 className="text-lg font-medium text-text-primary mb-3 flex items-center">
-                                <svg xmlns="http://www.w.3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2"><path strokeLinecap="round" strokeLinejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.122 2.122l7.81-7.81" /></svg>
-                                Archivos de la Póliza
-                            </h3>
-                            {isFilesLoading ? (
-                                <div className="flex justify-center p-4"><Spinner /></div>
-                            ) : fileError ? (
-                                <p className="text-red-500 text-sm">{fileError}</p>
-                            ) : (
-                                <div className="space-y-2">
-                                    {files.length === 0 && !isUploading && (
-                                        <p className="text-text-secondary text-sm">No hay archivos adjuntos.</p>
-                                    )}
-                                    {files.map(file => (
-                                        <div key={file.id} className="flex items-center justify-between bg-secondary p-2 rounded">
-                                            <span className="text-sm truncate">{file.name}</span>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleDownload(file)}
-                                                disabled={downloadingFileId === file.id}
-                                                className="text-accent hover:underline p-1 disabled:opacity-50"
-                                                title="Descargar"
-                                            >
-                                                {downloadingFileId === file.id ? <Spinner/> : <ArrowDownTrayIcon className="w-5 h-5"/>}
-                                            </button>
-                                        </div>
-                                    ))}
-                                    {isUploading && (
-                                        <div className="flex items-center text-sm text-text-secondary">
-                                            <Spinner />
-                                            <span className="ml-2">Subiendo archivo...</span>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                            <div className="mt-4">
-                                <input
-                                    type="file"
-                                    ref={fileInputRef}
-                                    onChange={handleFileChange}
-                                    className="hidden"
-                                    disabled={isUploading}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={handleButtonClick}
-                                    disabled={isUploading}
-                                    className="flex items-center text-sm bg-secondary hover:bg-gray-600 text-white font-bold py-2 px-3 rounded-lg transition-colors disabled:opacity-50"
-                                >
-                                    <PlusIcon className="w-4 h-4 mr-2" />
-                                    Añadir Archivo
-                                </button>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                             <div>
+                                <label htmlFor="fecha_emision" className="block text-sm font-medium text-text-secondary mb-1">Fecha de Emisión</label>
+                                <input id="fecha_emision" type="date" name="fecha_emision" value={formData.fecha_emision} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required/>
+                            </div>
+                            <div>
+                                <label htmlFor="fecha_vencimiento" className="block text-sm font-medium text-text-secondary mb-1">Fecha de Vencimiento</label>
+                                <input id="fecha_vencimiento" type="date" name="fecha_vencimiento" value={formData.fecha_vencimiento} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required/>
                             </div>
                         </div>
-                    )}
+                        <div>
+                            <label htmlFor="estatus_poliza" className="block text-sm font-medium text-text-secondary mb-1">Estatus de la Póliza</label>
+                            <select id="estatus_poliza" name="estatus_poliza" value={formData.estatus_poliza} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary">
+                                <option value="ACTIVA">Activa</option>
+                                <option value="PENDIENTE PAGO">Pendiente Pago</option>
+                                <option value="CANCELADA">Cancelada</option>
+                                 <option value="VENCIDA">Vencida</option>
+                            </select>
+                        </div>
+
+                        {error && <p className="text-red-500 mt-4 text-sm">{error}</p>}
+
+                        {policy && (
+                             <div className="mt-6 border-t border-border pt-4">
+                                <h3 className="text-lg font-medium text-text-primary mb-3 flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2"><path strokeLinecap="round" strokeLinejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.122 2.122l7.81-7.81" /></svg>
+                                    Archivos de la Póliza
+                                </h3>
+                                {isFilesLoading ? (
+                                    <div className="flex justify-center p-4"><Spinner /></div>
+                                ) : fileError ? (
+                                    <p className="text-red-500 text-sm">{fileError}</p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {files.length === 0 && !isUploading && (
+                                            <p className="text-text-secondary text-sm">No hay archivos adjuntos.</p>
+                                        )}
+                                        {files.map(file => (
+                                            <div key={file.id} className="flex items-center justify-between bg-secondary p-2 rounded">
+                                                <span className="text-sm truncate mr-2">{file.name}</span>
+                                                <div className="flex items-center space-x-2 flex-shrink-0">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDownload(file)}
+                                                        disabled={downloadingFileId === file.id}
+                                                        className="text-accent hover:underline p-1 disabled:opacity-50"
+                                                        title="Descargar"
+                                                    >
+                                                        {downloadingFileId === file.id ? <Spinner/> : <ArrowDownTrayIcon className="w-5 h-5"/>}
+                                                    </button>
+                                                     <button
+                                                        type="button"
+                                                        onClick={() => handleDeleteRequest(file)}
+                                                        className="text-red-500 hover:text-red-400 p-1"
+                                                        title="Eliminar"
+                                                    >
+                                                        <TrashIcon className="w-5 h-5"/>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {isUploading && (
+                                            <div className="flex items-center text-sm text-text-secondary">
+                                                <Spinner />
+                                                <span className="ml-2">Subiendo archivo...</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                                <div className="mt-4">
+                                    <input
+                                        type="file"
+                                        ref={fileInputRef}
+                                        onChange={handleFileChange}
+                                        className="hidden"
+                                        disabled={isUploading}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleButtonClick}
+                                        disabled={isUploading}
+                                        className="flex items-center text-sm bg-secondary hover:bg-gray-600 text-white font-bold py-2 px-3 rounded-lg transition-colors disabled:opacity-50"
+                                    >
+                                        <PlusIcon className="w-4 h-4 mr-2" />
+                                        Añadir Archivo
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
 
-                    <div className="mt-6 flex justify-end space-x-4">
-                        <button type="button" onClick={onClose} className="bg-secondary hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition-colors" disabled={isSaving}>Cancelar</button>
-                        <button type="submit" className="bg-primary hover:bg-accent text-white font-bold py-2 px-4 rounded transition-colors" disabled={isSaving}>
-                            {isSaving ? 'Guardando...' : 'Guardar'}
-                        </button>
-                    </div>
-                </form>
+                        <div className="mt-6 flex justify-end space-x-4">
+                            <button type="button" onClick={onClose} className="bg-secondary hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition-colors" disabled={isSaving}>Cancelar</button>
+                            <button type="submit" className="bg-primary hover:bg-accent text-white font-bold py-2 px-4 rounded transition-colors" disabled={isSaving}>
+                                {isSaving ? 'Guardando...' : 'Guardar'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
-        </div>
+            <ConfirmationModal
+                isOpen={isConfirmDeleteOpen}
+                title="Confirmar Eliminación de Archivo"
+                message={`¿Estás seguro de que quieres eliminar el archivo "${fileToDelete?.name}"? Esta acción no se puede deshacer.`}
+                onConfirm={handleConfirmDelete}
+                onCancel={() => setIsConfirmDeleteOpen(false)}
+                confirmText={isDeleting ? 'Eliminando...' : 'Eliminar'}
+            />
+        </>
     );
 };
 
