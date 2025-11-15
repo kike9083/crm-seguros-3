@@ -7,8 +7,9 @@ import DocumentTextIcon from './icons/DocumentTextIcon';
 import CogIcon from './icons/CogIcon';
 import PresentationChartLineIcon from './icons/PresentationChartLineIcon';
 import { Profile } from '../types';
+import QuestionMarkCircleIcon from './icons/QuestionMarkCircleIcon';
 
-type View = 'dashboard' | 'pipeline' | 'clients' | 'tasks' | 'policies' | 'settings' | 'reports';
+type View = 'dashboard' | 'pipeline' | 'clients' | 'tasks' | 'policies' | 'settings' | 'reports' | 'help';
 
 interface SideNavProps {
     currentView: View;
@@ -24,6 +25,7 @@ const navItems = [
     { id: 'policies', label: 'Pólizas', icon: DocumentTextIcon, roles: ['ADMIN', 'AGENTE'] },
     { id: 'reports', label: 'Reportes', icon: PresentationChartLineIcon, roles: ['ADMIN', 'AGENTE'] },
     { id: 'settings', label: 'Configuración', icon: CogIcon, roles: ['ADMIN'] },
+    { id: 'help', label: 'Ayuda y Guía', icon: QuestionMarkCircleIcon, roles: ['ADMIN', 'AGENTE'] },
 ] as const;
 
 

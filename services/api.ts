@@ -1,6 +1,5 @@
-
 import { supabase } from './supabaseClient';
-import { Lead, Client, Policy, Task, Product, Profile, UserRole, FileObject, LeadStatus } from '../types';
+import { Lead, Client, Policy, Task, Product, Profile, UserRole, FileObject, Team } from '../types';
 import { AuthError, Session, User } from '@supabase/supabase-js';
 
 // Re-export supabase client for direct use in other modules if needed
@@ -39,7 +38,8 @@ export const signUp = async (email: string, password: string, nombre: string): P
 };
 
 export const signOut = async () => {
-    await supabase.auth.signOut();
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
 };
 
 export const getSession = async () => {
@@ -63,14 +63,15 @@ export const updateUserMetadata = async (metadata: object) => {
 
 // Profiles
 export const getProfile = async (userId: string): Promise<Profile | null> => {
-    const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-    if (error && error.code !== 'PGRST116') { // PGRST116: 'exact-one-row-not-found'
-        console.error("Error fetching profile:", error);
-        throw error;
+    const { data, error } = await supabase.rpc('get_profile_for_user', { p_user_id: userId }).single();
+    
+    // The AuthProvider will fall back to using user_metadata if this fails, 
+    // making the app more resilient to database issues like RLS recursion.
+    if (error) {
+        // FIX: Simplify console log to prevent "[object Object]" display issues.
+        // The browser console can render the error object inspectable on its own.
+        console.error("Error fetching profile via RPC:", error);
+        return null;
     }
     return data as Profile | null;
 };
@@ -94,14 +95,23 @@ export const createProfile = async (profile: { id: string, nombre: string, rol: 
     return data;
 };
 
-export const createNewUser = async (email: string, password: string, nombre: string, rol: UserRole) => {
-    const { data, error } = await supabase.rpc('create_new_user', {
+export const createNewUser = async (email: string, password: string, nombre: string, rol: UserRole, team_id: string | null) => {
+     // This is a Supabase Edge Function that handles user creation securely.
+    const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        nombre,
-        rol
+        options: {
+            data: {
+                nombre,
+                rol,
+                team_id,
+            },
+        },
     });
-    if(error) throw error;
+    
+    if (error) throw error;
+    
+    // The trigger `on_auth_user_created` will handle inserting into public.profiles
     return data;
 }
 
@@ -112,7 +122,7 @@ export const getLeads = async () => {
     return data as Lead[];
 };
 
-export const createLead = async (leadData: Omit<Lead, 'id' | 'created_at' | 'agent_id'>) => {
+export const createLead = async (leadData: Omit<Lead, 'id' | 'created_at' | 'agent_id' | 'team_id'>) => {
     const { data, error } = await supabase.rpc('create_lead_secure', {
         p_nombre: leadData.nombre,
         p_email: leadData.email,
@@ -125,7 +135,7 @@ export const createLead = async (leadData: Omit<Lead, 'id' | 'created_at' | 'age
     return data as Lead;
 };
 
-export const updateLead = async (id: number, updates: Omit<Lead, 'id' | 'created_at' | 'agent_id'>) => {
+export const updateLead = async (id: number, updates: Omit<Lead, 'id' | 'created_at' | 'agent_id' | 'team_id'>) => {
     const { data, error } = await supabase.rpc('update_lead_secure', {
         p_id: id,
         p_nombre: updates.nombre,
@@ -140,14 +150,11 @@ export const updateLead = async (id: number, updates: Omit<Lead, 'id' | 'created
 };
 
 export const deleteLead = async (id: number) => {
-    // Assuming an RPC function `delete_lead_secure` exists that handles permissions.
     const { error } = await supabase.rpc('delete_lead_secure', { p_id: id });
     if (error) throw error;
 };
 
 export const promoteLeadToClient = async (leadId: number) => {
-    // FIX: Use the correct, simplified RPC call syntax.
-    // The corrected DB script ensures only one function signature exists, removing ambiguity.
     const { data, error } = await supabase.rpc('promote_lead_to_client', { p_lead_id: leadId });
     if (error) throw error;
     return data;
@@ -160,7 +167,7 @@ export const getClients = async () => {
     return data as Client[];
 };
 
-export const updateClient = async (id: number, updates: Omit<Client, 'id' | 'created_at' | 'lead_origen_id' | 'agent_id'>) => {
+export const updateClient = async (id: number, updates: Omit<Client, 'id' | 'created_at' | 'lead_origen_id' | 'agent_id' | 'team_id'>) => {
     const { data, error } = await supabase.rpc('update_client_secure', {
         p_id: id,
         p_nombre: updates.nombre,
@@ -173,7 +180,6 @@ export const updateClient = async (id: number, updates: Omit<Client, 'id' | 'cre
 };
 
 export const deleteClient = async (id: number) => {
-    // Assuming an RPC function `delete_client_secure` exists that handles permissions.
     const { error } = await supabase.rpc('delete_client_secure', { p_id: id });
     if (error) throw error;
 };
@@ -185,7 +191,7 @@ export const getPolicies = async () => {
     return data as unknown as Policy[];
 };
 
-export const createPolicy = async (policyData: Omit<Policy, 'id' | 'created_at' | 'clients' | 'products' | 'comision_agente' | 'agent_id'>) => {
+export const createPolicy = async (policyData: Omit<Policy, 'id' | 'created_at' | 'clients' | 'products' | 'comision_agente' | 'agent_id' | 'team_id'>) => {
     const { data, error } = await supabase.rpc('create_policy_secure', {
         p_client_id: policyData.client_id,
         p_product_id: policyData.product_id,
@@ -198,7 +204,7 @@ export const createPolicy = async (policyData: Omit<Policy, 'id' | 'created_at' 
     return data as Policy;
 };
 
-export const updatePolicy = async (id: number, updates: Omit<Policy, 'id' | 'created_at' | 'clients' | 'products' | 'comision_agente' | 'agent_id'>) => {
+export const updatePolicy = async (id: number, updates: Omit<Policy, 'id' | 'created_at' | 'clients' | 'products' | 'comision_agente' | 'agent_id' | 'team_id'>) => {
     const { data, error } = await supabase.rpc('update_policy_secure', {
         p_id: id,
         p_client_id: updates.client_id,
@@ -213,7 +219,6 @@ export const updatePolicy = async (id: number, updates: Omit<Policy, 'id' | 'cre
 };
 
 export const deletePolicy = async (id: number) => {
-    // Assuming an RPC function `delete_policy_secure` exists that handles permissions.
     const { error } = await supabase.rpc('delete_policy_secure', { p_id: id });
     if (error) throw error;
 };
@@ -243,8 +248,7 @@ export const getPublicUrl = (bucket: string, path: string) => {
 
 // Products
 export const getProducts = async () => {
-    // FIX: Use the secure RPC function to avoid the infinite recursion RLS error.
-    const { data, error } = await supabase.rpc('get_products_for_user');
+    const { data, error } = await supabase.rpc('get_all_products');
     if (error) throw error;
     return data as Product[];
 };
@@ -290,8 +294,7 @@ export const getTasks = async () => {
     return data as unknown as Task[];
 };
 
-export const createTask = async (taskData: Omit<Task, 'id' | 'created_at' | 'leads' | 'clients' | 'agent_id'>) => {
-    // FIX: Ensure optional foreign keys are passed as null, not undefined, to match the RPC function signature.
+export const createTask = async (taskData: Omit<Task, 'id' | 'created_at' | 'leads' | 'clients' | 'agent_id' | 'team_id'>) => {
     const { data, error } = await supabase.rpc('create_task_secure', {
         p_descripcion: taskData.descripcion,
         p_tipo: taskData.tipo,
@@ -305,8 +308,7 @@ export const createTask = async (taskData: Omit<Task, 'id' | 'created_at' | 'lea
     return data as Task;
 };
 
-export const updateTask = async (id: number, updates: Omit<Task, 'id' | 'created_at' | 'leads' | 'clients' | 'agent_id'>) => {
-    // FIX: Ensure optional foreign keys are passed as null, not undefined, to match the RPC function signature.
+export const updateTask = async (id: number, updates: Omit<Task, 'id' | 'created_at' | 'leads' | 'clients' | 'agent_id' | 'team_id'>) => {
     const { data, error } = await supabase.rpc('update_task_secure', {
         p_id: id,
         p_descripcion: updates.descripcion,
@@ -322,7 +324,6 @@ export const updateTask = async (id: number, updates: Omit<Task, 'id' | 'created
 };
 
 export const deleteTask = async (id: number) => {
-    // Assuming an RPC function `delete_task_secure` exists that handles permissions.
     const { error } = await supabase.rpc('delete_task_secure', { p_id: id });
     if (error) throw error;
 };
@@ -346,4 +347,33 @@ export const getExpiringPolicies = async (days: number) => {
     const { data, error } = await supabase.rpc('get_expiring_policies_for_user', { days_in_future: days });
     if (error) throw error;
     return data as unknown as Policy[];
+}
+
+// Teams
+export const getTeams = async (): Promise<Team[]> => {
+    const { data, error } = await supabase.rpc('get_teams');
+    if (error) throw error;
+    return data as Team[];
+}
+
+export const createTeam = async (name: string): Promise<Team> => {
+    const { data, error } = await supabase.rpc('create_team', { p_name: name }).single();
+    if (error) throw error;
+    return data as Team;
+}
+
+export const updateTeam = async (id: string, name: string): Promise<Team> => {
+    const { data, error } = await supabase.rpc('update_team', { p_id: id, p_name: name }).single();
+    if (error) throw error;
+    return data as Team;
+}
+
+export const deleteTeam = async (id: string) => {
+    const { error } = await supabase.rpc('delete_team', { p_id: id });
+    if (error) throw error;
+}
+
+export const updateUserTeam = async (userId: string, teamId: string | null) => {
+    const { error } = await supabase.rpc('update_user_team', { p_user_id: userId, p_team_id: teamId });
+    if (error) throw error;
 }

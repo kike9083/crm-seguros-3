@@ -97,7 +97,9 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
             await updateClient(client.id, dataToUpdate);
             onSave();
         } catch (err) {
-            setError(`Error al guardar el cliente: ${getErrorMessage(err)}`);
+            const message = `Error al guardar el cliente: ${getErrorMessage(err)}`;
+            setError(message);
+            alert(message);
             console.error(err);
         } finally {
             setIsSaving(false);

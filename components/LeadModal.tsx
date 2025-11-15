@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { createLead, updateLead, promoteLeadToClient, deleteLead, getErrorMessage } from '../services/api';
 import { Lead, LeadStatus } from '../types';
@@ -65,7 +64,9 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
             }
             onSave();
         } catch (err) {
-            setError(`Error al guardar el lead: ${getErrorMessage(err)}`);
+            const message = `Error al guardar el lead: ${getErrorMessage(err)}`;
+            setError(message);
+            alert(message);
             console.error(err);
         } finally {
             setIsSaving(false);

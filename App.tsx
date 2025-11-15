@@ -12,8 +12,9 @@ import PoliciesList from './components/PoliciesList';
 import Settings from './components/settings/Settings';
 import { Profile } from './types';
 import Reports from './components/Reports';
+import HelpGuide from './components/HelpGuide';
 
-type View = 'dashboard' | 'pipeline' | 'clients' | 'tasks' | 'policies' | 'settings' | 'reports';
+type View = 'dashboard' | 'pipeline' | 'clients' | 'tasks' | 'policies' | 'settings' | 'reports' | 'help';
 
 interface MainAppProps {
     profile: Profile;
@@ -37,8 +38,9 @@ const MainApp: React.FC<MainAppProps> = ({ profile }) => {
             case 'settings':
                 return <Settings />;
             case 'reports':
-                // FIX: Correctly render the Reports component, which was previously undefined.
                 return <Reports />;
+            case 'help':
+                return <HelpGuide />;
             default:
                 return <Dashboard />;
         }

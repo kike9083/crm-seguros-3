@@ -140,7 +140,9 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
             }
             onSave();
         } catch (err) {
-            setError(`Error al guardar la póliza: ${getErrorMessage(err)}`);
+            const message = `Error al guardar la póliza: ${getErrorMessage(err)}`;
+            setError(message);
+            alert(message);
             console.error(err);
         } finally {
             setIsSaving(false);

@@ -65,7 +65,9 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, onSave })
             }
             onSave();
         } catch (err) {
-            setError(`Error al guardar el producto: ${getErrorMessage(err)}`);
+            const message = `Error al guardar el producto: ${getErrorMessage(err)}`;
+            setError(message);
+            alert(message);
             console.error(err);
         } finally {
             setIsSaving(false);

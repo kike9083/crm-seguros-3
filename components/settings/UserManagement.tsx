@@ -1,24 +1,26 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getAllProfiles, getErrorMessage } from '../../services/api';
-import { Profile } from '../../types';
+import { getAllProfiles, getTeams, updateUserTeam, getErrorMessage } from '../../services/api';
+import { Profile, Team } from '../../types';
 import Spinner from '../Spinner';
 import PlusIcon from '../icons/PlusIcon';
 import UserModal from './UserModal';
 
 const UserManagement: React.FC = () => {
     const [profiles, setProfiles] = useState<Profile[]>([]);
+    const [teams, setTeams] = useState<Team[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
 
-    const fetchProfiles = useCallback(async () => {
+    const fetchData = useCallback(async () => {
         try {
             setLoading(true);
             setError(null);
-            const data = await getAllProfiles();
-            setProfiles(data);
+            const [profilesData, teamsData] = await Promise.all([getAllProfiles(), getTeams()]);
+            setProfiles(profilesData);
+            setTeams(teamsData);
         } catch (err) {
-            setError(`No se pudieron cargar los usuarios: ${getErrorMessage(err)}`);
+            setError(`No se pudieron cargar los datos: ${getErrorMessage(err)}`);
             console.error(err);
         } finally {
             setLoading(false);
@@ -26,12 +28,23 @@ const UserManagement: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        fetchProfiles();
-    }, [fetchProfiles]);
+        fetchData();
+    }, [fetchData]);
 
     const handleSave = () => {
         setIsModalOpen(false);
-        fetchProfiles();
+        fetchData();
+    };
+
+    const handleTeamChange = async (userId: string, teamId: string) => {
+        try {
+            await updateUserTeam(userId, teamId === 'null' ? null : teamId);
+            // Optimistic update
+            setProfiles(prev => prev.map(p => p.id === userId ? { ...p, team_id: teamId === 'null' ? undefined : teamId } : p));
+        } catch (err) {
+            alert(`Error al actualizar el equipo: ${getErrorMessage(err)}`);
+            fetchData(); // Revert on error
+        }
     };
 
     if (loading) return <div className="flex justify-center items-center h-full"><Spinner /></div>;
@@ -55,6 +68,7 @@ const UserManagement: React.FC = () => {
                             <tr>
                                 <th className="p-4">Nombre</th>
                                 <th className="p-4">Rol</th>
+                                <th className="p-4">Equipo</th>
                                 <th className="p-4">ID de Usuario</th>
                             </tr>
                         </thead>
@@ -66,6 +80,18 @@ const UserManagement: React.FC = () => {
                                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${profile.rol === 'ADMIN' ? 'bg-indigo-500 text-white' : 'bg-gray-500 text-white'}`}>
                                             {profile.rol}
                                         </span>
+                                    </td>
+                                    <td className="p-4">
+                                        <select
+                                            value={profile.team_id || 'null'}
+                                            onChange={(e) => handleTeamChange(profile.id, e.target.value)}
+                                            className="bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary"
+                                        >
+                                            <option value="null">Sin equipo</option>
+                                            {teams.map(team => (
+                                                <option key={team.id} value={team.id}>{team.name}</option>
+                                            ))}
+                                        </select>
                                     </td>
                                     <td className="p-4 text-text-secondary text-xs">{profile.id}</td>
                                 </tr>
@@ -81,6 +107,7 @@ const UserManagement: React.FC = () => {
                 <UserModal
                     onClose={() => setIsModalOpen(false)}
                     onSave={handleSave}
+                    teams={teams}
                 />
             )}
         </>
