@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { createPolicy, updatePolicy, getClients, getProducts, getFiles, uploadFile, getPublicUrl, getErrorMessage } from '../services/api';
+import { createPolicy, updatePolicy, getClients, getProducts, getFiles, uploadFile, createSignedUrl, getErrorMessage } from '../services/api';
 import { Client, Product, Policy, PolicyStatus, FileObject } from '../types';
 import { useAuth } from './auth/AuthContext';
 import Spinner from './Spinner';
 import PlusIcon from './icons/PlusIcon';
+import ArrowDownTrayIcon from './icons/ArrowDownTrayIcon';
 
 interface PolicyModalProps {
     policy: Policy | null;
@@ -32,6 +33,7 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
     const [isUploading, setIsUploading] = useState(false);
     const [fileError, setFileError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
 
     const fetchFiles = useCallback(async () => {
         if (!policy) return;
@@ -111,6 +113,20 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
 
     const handleButtonClick = () => {
         fileInputRef.current?.click();
+    };
+
+    const handleDownload = async (file: FileObject) => {
+        if (!policy) return;
+        setDownloadingFileId(file.id);
+        try {
+            const path = `${policy.id}/${file.name}`;
+            const signedUrl = await createSignedUrl('policy_files', path);
+            window.open(signedUrl, '_blank');
+        } catch (err) {
+            alert(`No se pudo generar el enlace de descarga: ${getErrorMessage(err)}`);
+        } finally {
+            setDownloadingFileId(null);
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -199,7 +215,7 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
                     {policy && (
                          <div className="mt-6 border-t border-border pt-4">
                             <h3 className="text-lg font-medium text-text-primary mb-3 flex items-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2"><path strokeLinecap="round" strokeLinejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.122 2.122l7.81-7.81" /></svg>
+                                <svg xmlns="http://www.w.3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2"><path strokeLinecap="round" strokeLinejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.122 2.122l7.81-7.81" /></svg>
                                 Archivos de la Póliza
                             </h3>
                             {isFilesLoading ? (
@@ -214,16 +230,15 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
                                     {files.map(file => (
                                         <div key={file.id} className="flex items-center justify-between bg-secondary p-2 rounded">
                                             <span className="text-sm truncate">{file.name}</span>
-                                            <a
-                                                href={getPublicUrl('policy_files', `${policy.id}/${file.name}`)}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                download
-                                                className="text-accent hover:underline p-1"
+                                            <button
+                                                type="button"
+                                                onClick={() => handleDownload(file)}
+                                                disabled={downloadingFileId === file.id}
+                                                className="text-accent hover:underline p-1 disabled:opacity-50"
                                                 title="Descargar"
                                             >
-                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
-                                            </a>
+                                                {downloadingFileId === file.id ? <Spinner/> : <ArrowDownTrayIcon className="w-5 h-5"/>}
+                                            </button>
                                         </div>
                                     ))}
                                     {isUploading && (

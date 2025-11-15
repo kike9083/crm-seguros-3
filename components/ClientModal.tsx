@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { updateClient, getFiles, uploadFile, getPublicUrl, getErrorMessage } from '../services/api';
+import { updateClient, getFiles, uploadFile, createSignedUrl, getErrorMessage } from '../services/api';
 import { Client, FileObject } from '../types';
 import Spinner from './Spinner';
 import PlusIcon from './icons/PlusIcon';
+import ArrowDownTrayIcon from './icons/ArrowDownTrayIcon';
 
 interface ClientModalProps {
     client: Client;
@@ -25,6 +26,8 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
     const [isUploading, setIsUploading] = useState(false);
     const [fileError, setFileError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
+
 
     const fetchFiles = useCallback(async () => {
         if (!client) return;
@@ -81,6 +84,20 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
 
     const handleButtonClick = () => {
         fileInputRef.current?.click();
+    };
+    
+    const handleDownload = async (file: FileObject) => {
+        if (!client) return;
+        setDownloadingFileId(file.id);
+        try {
+            const path = `${client.id}/${file.name}`;
+            const signedUrl = await createSignedUrl('client_files', path);
+            window.open(signedUrl, '_blank');
+        } catch (err) {
+            alert(`No se pudo generar el enlace de descarga: ${getErrorMessage(err)}`);
+        } finally {
+            setDownloadingFileId(null);
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -149,16 +166,15 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
                                 {files.map(file => (
                                     <div key={file.id} className="flex items-center justify-between bg-secondary p-2 rounded">
                                         <span className="text-sm truncate">{file.name}</span>
-                                        <a
-                                            href={getPublicUrl('client_files', `${client.id}/${file.name}`)}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            download
-                                            className="text-accent hover:underline p-1"
+                                         <button
+                                            type="button"
+                                            onClick={() => handleDownload(file)}
+                                            disabled={downloadingFileId === file.id}
+                                            className="text-accent hover:underline p-1 disabled:opacity-50"
                                             title="Descargar"
                                         >
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
-                                        </a>
+                                            {downloadingFileId === file.id ? <Spinner/> : <ArrowDownTrayIcon className="w-5 h-5"/>}
+                                        </button>
                                     </div>
                                 ))}
                                 {isUploading && (

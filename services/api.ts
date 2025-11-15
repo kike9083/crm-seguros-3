@@ -240,9 +240,10 @@ export const getFiles = async (bucket: string, path: string): Promise<FileObject
     return (data as FileObject[]) || [];
 };
 
-export const getPublicUrl = (bucket: string, path: string) => {
-    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-    return data.publicUrl;
+export const createSignedUrl = async (bucket: string, path: string): Promise<string> => {
+    const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 60); // 60 seconds validity
+    if (error) throw error;
+    return data.signedUrl;
 };
 
 
