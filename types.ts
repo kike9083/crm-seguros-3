@@ -2,6 +2,7 @@ export type LeadStatus = 'NUEVO' | 'CONTACTADO' | 'CALIFICADO' | 'PERDIDO' | 'GA
 export type TaskStatus = 'PENDIENTE' | 'EN PROGRESO' | 'COMPLETADA';
 export type PolicyStatus = 'ACTIVA' | 'PENDIENTE PAGO' | 'CANCELADA' | 'VENCIDA';
 export type UserRole = 'ADMIN' | 'AGENTE';
+export type ProductCategory = 'autos' | 'salud' | 'vida' | 'daños' | 'inversion';
 
 export interface Team {
     id: string; // uuid
@@ -65,7 +66,7 @@ export interface Product {
     comision_porcentaje: number;
     precio_base: number;
     activo: boolean;
-    categoria?: string;
+    categoria?: ProductCategory;
     descripcion?: string;
 }
 

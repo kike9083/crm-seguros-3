@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createProduct, updateProduct, getErrorMessage } from '../services/api';
-import { Product } from '../types';
+import { Product, ProductCategory } from '../types';
+import { PRODUCT_CATEGORIES } from '../constants';
 
 interface ProductModalProps {
     product: Product | null;
@@ -12,7 +13,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, onSave })
     const [formData, setFormData] = useState({
         nombre: '',
         aseguradora: '',
-        categoria: 'General',
+        categoria: 'vida' as ProductCategory,
         comision_porcentaje: 0,
         precio_base: 0,
         activo: true,
@@ -26,7 +27,7 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, onSave })
             setFormData({
                 nombre: product.nombre || '',
                 aseguradora: product.aseguradora || '',
-                categoria: product.categoria || 'General',
+                categoria: product.categoria || 'vida',
                 comision_porcentaje: product.comision_porcentaje || 0,
                 precio_base: product.precio_base || 0,
                 activo: product.activo,
@@ -90,7 +91,18 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, onSave })
                         </div>
                         <div>
                             <label htmlFor="categoria" className="block text-sm font-medium text-text-secondary mb-1">Categoría</label>
-                             <input id="categoria" name="categoria" value={formData.categoria} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
+                             <select 
+                                id="categoria" 
+                                name="categoria" 
+                                value={formData.categoria} 
+                                onChange={handleChange} 
+                                className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary"
+                                required
+                            >
+                                {PRODUCT_CATEGORIES.map(cat => (
+                                    <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
+                                ))}
+                            </select>
                         </div>
                     </div>
                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
