@@ -13,6 +13,7 @@ const viewTitles: { [key: string]: string } = {
     clients: 'Clientes',
     tasks: 'Tareas y Seguimientos',
     policies: 'Pólizas',
+    products: 'Gestión de Productos',
     settings: 'Configuración',
     reports: 'Reportes',
     help: 'Ayuda y Guía',

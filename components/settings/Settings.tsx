@@ -1,21 +1,19 @@
 import React, { useState } from 'react';
-import ProductsList from '../ProductsList';
 import UserManagement from './UserManagement';
 import TeamManagement from './TeamManagement';
 import { useAuth } from '../auth/AuthContext';
 
-type SettingsTab = 'products' | 'users' | 'teams';
+type SettingsTab = 'users' | 'teams';
 
 const Settings: React.FC = () => {
     const { profile } = useAuth();
-    const [activeTab, setActiveTab] = useState<SettingsTab>('products');
+    const [activeTab, setActiveTab] = useState<SettingsTab>('users');
 
     if (profile?.rol !== 'ADMIN') {
         return <p className="text-red-500">No tienes permiso para ver esta sección.</p>;
     }
 
     const tabs: { id: SettingsTab; label: string }[] = [
-        { id: 'products', label: 'Gestión de Productos' },
         { id: 'users', label: 'Gestión de Usuarios' },
         { id: 'teams', label: 'Gestión de Equipos' },
     ];
@@ -24,7 +22,7 @@ const Settings: React.FC = () => {
         <div className="space-y-6">
             <div>
                 <h1 className="text-2xl font-bold">Configuración</h1>
-                <p className="text-text-secondary">Gestiona los productos, usuarios y equipos de la plataforma.</p>
+                <p className="text-text-secondary">Gestiona los usuarios y equipos de la plataforma.</p>
             </div>
             
             <div className="border-b border-border">
@@ -46,7 +44,6 @@ const Settings: React.FC = () => {
             </div>
 
             <div>
-                {activeTab === 'products' && <ProductsList />}
                 {activeTab === 'users' && <UserManagement />}
                 {activeTab === 'teams' && <TeamManagement />}
             </div>
