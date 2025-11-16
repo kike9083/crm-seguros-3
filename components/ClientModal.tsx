@@ -170,9 +170,15 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
                                 <input id="telefono" name="telefono" value={formData.telefono} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
                             </div>
                         </div>
-                        <div>
-                            <label htmlFor="fecha_nacimiento" className="block text-sm font-medium text-text-secondary mb-1">Fecha de Nacimiento</label>
-                            <input id="fecha_nacimiento" name="fecha_nacimiento" type="date" value={formData.fecha_nacimiento} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label htmlFor="fecha_nacimiento" className="block text-sm font-medium text-text-secondary mb-1">Fecha de Nacimiento</label>
+                                <input id="fecha_nacimiento" name="fecha_nacimiento" type="date" value={formData.fecha_nacimiento} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
+                            </div>
+                             <div>
+                                <label htmlFor="agent_name" className="block text-sm font-medium text-text-secondary mb-1">Agente Asignado</label>
+                                <input id="agent_name" name="agent_name" type="text" value={client.profiles?.nombre || 'No asignado'} readOnly className="w-full bg-gray-700 p-2 rounded border border-border focus:outline-none cursor-not-allowed" />
+                            </div>
                         </div>
 
                         {error && <p className="text-red-500 mt-4 text-sm">{error}</p>}

@@ -161,13 +161,13 @@ export const promoteLeadToClient = async (leadId: number) => {
 };
 
 // Clients
-export const getClients = async (searchTerm?: string) => {
+export const getClients = async (searchTerm?: string): Promise<Client[]> => {
     const { data, error } = await supabase.rpc('get_clients_for_user', { p_search_term: searchTerm || '' });
     if (error) throw error;
     return data as Client[];
 };
 
-export const updateClient = async (id: number, updates: Omit<Client, 'id' | 'created_at' | 'lead_origen_id' | 'agent_id' | 'team_id'>) => {
+export const updateClient = async (id: number, updates: Omit<Client, 'id' | 'created_at' | 'lead_origen_id' | 'agent_id' | 'team_id' | 'profiles'>) => {
     const { data, error } = await supabase.rpc('update_client_secure', {
         p_id: id,
         p_nombre: updates.nombre,

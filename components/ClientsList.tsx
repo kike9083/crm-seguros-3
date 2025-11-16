@@ -90,7 +90,7 @@ const ClientsList: React.FC = () => {
                  <div className="relative w-full max-w-md">
                     <input
                         type="text"
-                        placeholder="Buscar por nombre, email o teléfono..."
+                        placeholder="Buscar por nombre, email, teléfono o agente..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full bg-secondary p-2 pl-10 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary"
@@ -116,6 +116,7 @@ const ClientsList: React.FC = () => {
                                     <th className="p-4">Nombre</th>
                                     <th className="p-4">Email</th>
                                     <th className="p-4">Teléfono</th>
+                                    <th className="p-4">Agente Asignado</th>
                                     <th className="p-4">Fecha de Alta</th>
                                     <th className="p-4">Acciones</th>
                                 </tr>
@@ -126,6 +127,7 @@ const ClientsList: React.FC = () => {
                                         <td className="p-4 font-medium">{client.nombre}</td>
                                         <td className="p-4 text-text-secondary">{client.email}</td>
                                         <td className="p-4 text-text-secondary">{client.telefono}</td>
+                                        <td className="p-4 text-text-secondary">{client.profiles?.nombre || 'No asignado'}</td>
                                         <td className="p-4 text-text-secondary">{new Date(client.created_at).toLocaleDateString()}</td>
                                         <td className="p-4 space-x-2 whitespace-nowrap">
                                             <button onClick={() => handleOpenModal(client)} className="text-accent hover:underline">Editar</button>

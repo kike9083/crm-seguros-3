@@ -40,6 +40,7 @@ export interface Client {
     lead_origen_id?: number;
     agent_id?: string;
     team_id?: string;
+    profiles?: { nombre: string } | null;
 }
 
 export interface Policy {
