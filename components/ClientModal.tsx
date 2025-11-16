@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { updateClient, getFiles, uploadFile, createSignedUrl, getErrorMessage, deleteFile } from '../services/api';
-import { Client, FileObject } from '../types';
+import { updateClient, getFiles, uploadFile, createSignedUrl, getErrorMessage, deleteFile, getAllProfiles } from '../services/api';
+import { Client, FileObject, Profile } from '../types';
 import Spinner from './Spinner';
 import PlusIcon from './icons/PlusIcon';
 import ArrowDownTrayIcon from './icons/ArrowDownTrayIcon';
 import TrashIcon from './icons/TrashIcon';
 import ConfirmationModal from './ConfirmationModal';
+import { useAuth } from './auth/AuthContext';
 
 interface ClientModalProps {
     client: Client;
@@ -14,12 +15,15 @@ interface ClientModalProps {
 }
 
 const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) => {
+    const { profile } = useAuth();
     const [formData, setFormData] = useState({
         nombre: '',
         email: '',
         telefono: '',
         fecha_nacimiento: '',
+        agent_id: ''
     });
+    const [allAgents, setAllAgents] = useState<Profile[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -50,18 +54,25 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
     }, [client]);
 
     useEffect(() => {
+        if (profile?.rol === 'ADMIN') {
+            getAllProfiles()
+                .then(setAllAgents)
+                .catch(err => console.error("Failed to fetch agents", err));
+        }
+
         if (client) {
             setFormData({
                 nombre: client.nombre || '',
                 email: client.email || '',
                 telefono: client.telefono || '',
                 fecha_nacimiento: client.fecha_nacimiento ? client.fecha_nacimiento.split('T')[0] : '',
+                agent_id: client.agent_id || ''
             });
             fetchFiles();
         }
-    }, [client, fetchFiles]);
+    }, [client, fetchFiles, profile]);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
@@ -176,8 +187,23 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
                                 <input id="fecha_nacimiento" name="fecha_nacimiento" type="date" value={formData.fecha_nacimiento} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
                             </div>
                              <div>
-                                <label htmlFor="agent_name" className="block text-sm font-medium text-text-secondary mb-1">Agente Asignado</label>
-                                <input id="agent_name" name="agent_name" type="text" value={client.profiles?.nombre || 'No asignado'} readOnly className="w-full bg-gray-700 p-2 rounded border border-border focus:outline-none cursor-not-allowed" />
+                                <label htmlFor="agent_id" className="block text-sm font-medium text-text-secondary mb-1">Agente Asignado</label>
+                                {profile?.rol === 'ADMIN' ? (
+                                    <select
+                                        id="agent_id"
+                                        name="agent_id"
+                                        value={formData.agent_id}
+                                        onChange={handleChange}
+                                        className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary"
+                                    >
+                                        <option value="">Sin asignar</option>
+                                        {allAgents.map(agent => (
+                                            <option key={agent.id} value={agent.id}>{agent.nombre}</option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <input id="agent_name" name="agent_name" type="text" value={client.profiles?.nombre || 'No asignado'} readOnly className="w-full bg-gray-700 p-2 rounded border border-border focus:outline-none cursor-not-allowed" />
+                                )}
                             </div>
                         </div>
 

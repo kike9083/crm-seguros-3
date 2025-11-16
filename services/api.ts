@@ -167,13 +167,14 @@ export const getClients = async (searchTerm?: string): Promise<Client[]> => {
     return data as Client[];
 };
 
-export const updateClient = async (id: number, updates: Omit<Client, 'id' | 'created_at' | 'lead_origen_id' | 'agent_id' | 'team_id' | 'profiles'>) => {
+export const updateClient = async (id: number, updates: Partial<Omit<Client, 'id' | 'created_at' | 'lead_origen_id' | 'team_id' | 'profiles'>>) => {
     const { data, error } = await supabase.rpc('update_client_secure', {
         p_id: id,
         p_nombre: updates.nombre,
         p_email: updates.email,
         p_telefono: updates.telefono,
-        p_fecha_nacimiento: updates.fecha_nacimiento || null
+        p_fecha_nacimiento: updates.fecha_nacimiento || null,
+        p_agent_id: updates.agent_id || null
     }).single();
     if (error) throw error;
     return data as Client;
