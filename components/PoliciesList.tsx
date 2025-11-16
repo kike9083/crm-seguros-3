@@ -109,7 +109,7 @@ const PoliciesList: React.FC = () => {
                  <div className="relative w-full max-w-md">
                     <input
                         type="text"
-                        placeholder="Buscar por cliente o producto..."
+                        placeholder="Buscar por cliente, producto o agente..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="w-full bg-secondary p-2 pl-10 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary"
@@ -141,6 +141,7 @@ const PoliciesList: React.FC = () => {
                             <tr>
                                 <th className="p-4">Cliente</th>
                                 <th className="p-4">Producto</th>
+                                <th className="p-4">Agente Asignado</th>
                                 <th className="p-4">Prima Total</th>
                                 <th className="p-4">Comisión Agente</th>
                                 <th className="p-4">Fecha Vencimiento</th>
@@ -153,6 +154,7 @@ const PoliciesList: React.FC = () => {
                                 <tr key={policy.id} className="border-b border-border hover:bg-secondary">
                                     <td className="p-4 font-medium">{getRelatedName(policy.clients)}</td>
                                     <td className="p-4 text-text-secondary">{getRelatedName(policy.products)}</td>
+                                    <td className="p-4 text-text-secondary">{policy.profiles?.nombre || 'No asignado'}</td>
                                     <td className="p-4 text-text-secondary">${policy.prima_total.toLocaleString()}</td>
                                     <td className="p-4 text-text-secondary">${policy.comision_agente.toLocaleString()}</td>
                                     <td className="p-4 text-text-secondary">{new Date(policy.fecha_vencimiento).toLocaleDateString()}</td>

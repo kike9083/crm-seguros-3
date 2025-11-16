@@ -57,6 +57,7 @@ export interface Policy {
     team_id?: string;
     clients: { nombre: string } | { nombre: string }[] | null; 
     products: { nombre: string } | { nombre: string }[] | null;
+    profiles?: { nombre: string } | null;
 }
 
 export interface Product {

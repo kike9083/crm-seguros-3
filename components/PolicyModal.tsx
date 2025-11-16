@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { createPolicy, updatePolicy, getClients, getProducts, getFiles, uploadFile, createSignedUrl, getErrorMessage, deleteFile } from '../services/api';
-import { Client, Product, Policy, PolicyStatus, FileObject } from '../types';
+import { createPolicy, updatePolicy, getClients, getProducts, getFiles, uploadFile, createSignedUrl, getErrorMessage, deleteFile, getAllProfiles } from '../services/api';
+import { Client, Product, Policy, PolicyStatus, FileObject, Profile } from '../types';
 import { useAuth } from './auth/AuthContext';
 import Spinner from './Spinner';
 import PlusIcon from './icons/PlusIcon';
@@ -15,7 +15,7 @@ interface PolicyModalProps {
 }
 
 const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) => {
-    const { user } = useAuth();
+    const { user, profile } = useAuth();
     const [formData, setFormData] = useState({
         client_id: '',
         product_id: '',
@@ -23,10 +23,11 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
         fecha_emision: new Date().toISOString().split('T')[0],
         fecha_vencimiento: '',
         estatus_poliza: 'ACTIVA' as PolicyStatus,
-        agent_id: user?.id
+        agent_id: user?.id || ''
     });
     const [clients, setClients] = useState<Client[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
+    const [allAgents, setAllAgents] = useState<Profile[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -60,12 +61,17 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [clientsData, productsData] = await Promise.all([getClients(), getProducts()]);
+                const [clientsData, productsData, agentsData] = await Promise.all([
+                    getClients(), 
+                    getProducts(),
+                    profile?.rol === 'ADMIN' ? getAllProfiles() : Promise.resolve([])
+                ]);
                 setClients(clientsData);
                 setProducts(productsData.filter(p => p.activo || p.id === policy?.product_id));
+                setAllAgents(agentsData);
             } catch (err) {
-                console.error("Failed to fetch clients and products", err);
-                setError(`No se pudieron cargar clientes y productos: ${getErrorMessage(err)}`);
+                console.error("Failed to fetch data", err);
+                setError(`No se pudieron cargar datos: ${getErrorMessage(err)}`);
             }
         };
         fetchData();
@@ -78,12 +84,12 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
                 fecha_emision: policy.fecha_emision.split('T')[0],
                 fecha_vencimiento: policy.fecha_vencimiento.split('T')[0],
                 estatus_poliza: policy.estatus_poliza,
-                agent_id: policy.agent_id || user?.id
+                agent_id: policy.agent_id || user?.id || ''
             });
             fetchFiles();
         }
 
-    }, [policy, user, fetchFiles]);
+    }, [policy, user, fetchFiles, profile]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -199,24 +205,47 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
                 <div className="bg-card rounded-lg shadow-2xl p-8 w-full max-w-lg max-h-[90vh] overflow-y-auto">
                     <h2 className="text-2xl font-bold mb-6">{policy ? 'Editar Póliza' : 'Crear Nueva Póliza'}</h2>
                     <form onSubmit={handleSubmit} className="space-y-4">
-                        <div>
-                            <label htmlFor="client_id" className="block text-sm font-medium text-text-secondary mb-1">Cliente</label>
-                            <select id="client_id" name="client_id" value={formData.client_id} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required>
-                                <option value="">Seleccione un Cliente</option>
-                                {clients.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label htmlFor="product_id" className="block text-sm font-medium text-text-secondary mb-1">Producto</label>
-                            <select id="product_id" name="product_id" value={formData.product_id} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required>
-                                <option value="">Seleccione un Producto</option>
-                                 {products.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-                            </select>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label htmlFor="client_id" className="block text-sm font-medium text-text-secondary mb-1">Cliente</label>
+                                <select id="client_id" name="client_id" value={formData.client_id} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required>
+                                    <option value="">Seleccione un Cliente</option>
+                                    {clients.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label htmlFor="product_id" className="block text-sm font-medium text-text-secondary mb-1">Producto</label>
+                                <select id="product_id" name="product_id" value={formData.product_id} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required>
+                                    <option value="">Seleccione un Producto</option>
+                                     {products.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                                </select>
+                            </div>
                         </div>
                         
-                        <div>
-                            <label htmlFor="prima_total" className="block text-sm font-medium text-text-secondary mb-1">Prima Total Anual ($)</label>
-                            <input id="prima_total" type="number" step="0.01" name="prima_total" value={formData.prima_total} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required/>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label htmlFor="prima_total" className="block text-sm font-medium text-text-secondary mb-1">Prima Total Anual ($)</label>
+                                <input id="prima_total" type="number" step="0.01" name="prima_total" value={formData.prima_total} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required/>
+                            </div>
+                             <div>
+                                <label htmlFor="agent_id" className="block text-sm font-medium text-text-secondary mb-1">Agente Asignado</label>
+                                {profile?.rol === 'ADMIN' ? (
+                                    <select
+                                        id="agent_id"
+                                        name="agent_id"
+                                        value={formData.agent_id}
+                                        onChange={handleChange}
+                                        className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary"
+                                    >
+                                        <option value="">Sin asignar</option>
+                                        {allAgents.map(agent => (
+                                            <option key={agent.id} value={agent.id}>{agent.nombre}</option>
+                                        ))}
+                                    </select>
+                                ) : (
+                                    <input id="agent_name" name="agent_name" type="text" value={policy?.profiles?.nombre || 'No asignado'} readOnly className="w-full bg-gray-700 p-2 rounded border border-border focus:outline-none cursor-not-allowed" />
+                                )}
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

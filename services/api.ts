@@ -192,7 +192,7 @@ export const getPolicies = async (searchTerm?: string) => {
     return data as unknown as Policy[];
 };
 
-export const createPolicy = async (policyData: Omit<Policy, 'id' | 'created_at' | 'clients' | 'products' | 'comision_agente' | 'agent_id' | 'team_id'>) => {
+export const createPolicy = async (policyData: Omit<Policy, 'id' | 'created_at' | 'clients' | 'products' | 'comision_agente' | 'agent_id' | 'team_id' | 'profiles'>) => {
     const { data, error } = await supabase.rpc('create_policy_secure', {
         p_client_id: policyData.client_id,
         p_product_id: policyData.product_id,
@@ -205,7 +205,7 @@ export const createPolicy = async (policyData: Omit<Policy, 'id' | 'created_at' 
     return data as Policy;
 };
 
-export const updatePolicy = async (id: number, updates: Omit<Policy, 'id' | 'created_at' | 'clients' | 'products' | 'comision_agente' | 'agent_id' | 'team_id'>) => {
+export const updatePolicy = async (id: number, updates: Partial<Omit<Policy, 'id' | 'created_at' | 'clients' | 'products' | 'comision_agente' | 'team_id' | 'profiles'>>) => {
     const { data, error } = await supabase.rpc('update_policy_secure', {
         p_id: id,
         p_client_id: updates.client_id,
@@ -213,7 +213,8 @@ export const updatePolicy = async (id: number, updates: Omit<Policy, 'id' | 'cre
         p_prima_total: updates.prima_total,
         p_fecha_emision: updates.fecha_emision,
         p_fecha_vencimiento: updates.fecha_vencimiento,
-        p_estatus_poliza: updates.estatus_poliza
+        p_estatus_poliza: updates.estatus_poliza,
+        p_agent_id: updates.agent_id
     }).single();
     if (error) throw error;
     return data as Policy;
