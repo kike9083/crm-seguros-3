@@ -2,19 +2,11 @@ export type LeadStatus = 'NUEVO' | 'CONTACTADO' | 'CALIFICADO' | 'PERDIDO' | 'GA
 export type TaskStatus = 'PENDIENTE' | 'EN PROGRESO' | 'COMPLETADA';
 export type PolicyStatus = 'ACTIVA' | 'PENDIENTE PAGO' | 'CANCELADA' | 'VENCIDA';
 export type UserRole = 'ADMIN' | 'AGENTE';
-export type ProductCategory = 'autos' | 'salud' | 'vida' | 'daños' | 'inversion';
-
-export interface Team {
-    id: string; // uuid
-    name: string;
-    created_at: string;
-}
 
 export interface Profile {
     id: string; // uuid
     nombre: string;
     rol: UserRole;
-    team_id?: string; // uuid
 }
 
 export interface Lead {
@@ -27,7 +19,6 @@ export interface Lead {
     estatus_lead: LeadStatus;
     agent_id?: string;
     notas?: string;
-    team_id?: string;
 }
 
 export interface Client {
@@ -39,8 +30,6 @@ export interface Client {
     fecha_nacimiento?: string;
     lead_origen_id?: number;
     agent_id?: string;
-    team_id?: string;
-    profiles?: { nombre: string } | null;
 }
 
 export interface Policy {
@@ -54,10 +43,8 @@ export interface Policy {
     estatus_poliza: PolicyStatus;
     comision_agente: number;
     agent_id?: string;
-    team_id?: string;
     clients: { nombre: string } | { nombre: string }[] | null; 
     products: { nombre: string } | { nombre: string }[] | null;
-    profiles?: { nombre: string } | null;
 }
 
 export interface Product {
@@ -68,7 +55,7 @@ export interface Product {
     comision_porcentaje: number;
     precio_base: number;
     activo: boolean;
-    categoria?: ProductCategory;
+    categoria?: string;
     descripcion?: string;
 }
 
@@ -83,7 +70,6 @@ export interface Task {
     descripcion: string;
     estatus: TaskStatus;
     agent_id?: string;
-    team_id?: string;
     leads?: { nombre: string } | { nombre: string }[] | null;
     clients?: { nombre: string } | { nombre: string }[] | null;
 }
