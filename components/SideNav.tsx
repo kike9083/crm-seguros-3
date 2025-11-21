@@ -6,10 +6,11 @@ import ClipboardListIcon from './icons/ClipboardListIcon';
 import DocumentTextIcon from './icons/DocumentTextIcon';
 import CogIcon from './icons/CogIcon';
 import PresentationChartLineIcon from './icons/PresentationChartLineIcon';
-import TagIcon from './icons/TagIcon';
 import { Profile } from '../types';
+import QuestionMarkCircleIcon from './icons/QuestionMarkCircleIcon';
+import BriefcaseIcon from './icons/BriefcaseIcon';
 
-type View = 'dashboard' | 'pipeline' | 'clients' | 'tasks' | 'policies' | 'products' | 'settings' | 'reports';
+type View = 'dashboard' | 'pipeline' | 'clients' | 'tasks' | 'policies' | 'products' | 'settings' | 'reports' | 'help';
 
 interface SideNavProps {
     currentView: View;
@@ -23,9 +24,10 @@ const navItems = [
     { id: 'clients', label: 'Clientes', icon: UserGroupIcon, roles: ['ADMIN', 'AGENTE'] },
     { id: 'tasks', label: 'Tareas', icon: ClipboardListIcon, roles: ['ADMIN', 'AGENTE'] },
     { id: 'policies', label: 'Pólizas', icon: DocumentTextIcon, roles: ['ADMIN', 'AGENTE'] },
-    { id: 'products', label: 'Productos', icon: TagIcon, roles: ['ADMIN', 'AGENTE'] },
+    { id: 'products', label: 'Productos', icon: BriefcaseIcon, roles: ['ADMIN', 'AGENTE'] },
     { id: 'reports', label: 'Reportes', icon: PresentationChartLineIcon, roles: ['ADMIN', 'AGENTE'] },
     { id: 'settings', label: 'Configuración', icon: CogIcon, roles: ['ADMIN'] },
+    { id: 'help', label: 'Ayuda y Guía', icon: QuestionMarkCircleIcon, roles: ['ADMIN', 'AGENTE'] },
 ] as const;
 
 

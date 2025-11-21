@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { createTask, updateTask, getLeads, getClients, deleteTask, getErrorMessage } from '../services/api';
 import { Task, TaskStatus, Lead, Client } from '../types';
@@ -95,7 +94,9 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onSave }) => {
             }
             onSave();
         } catch (err) {
-            setError(`Error al guardar la tarea: ${getErrorMessage(err)}`);
+            const message = `Error al guardar la tarea: ${getErrorMessage(err)}`;
+            setError(message);
+            alert(message);
             console.error(err);
         } finally {
             setIsSaving(false);

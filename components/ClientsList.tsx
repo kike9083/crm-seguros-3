@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { getClients, deleteClient, getErrorMessage } from '../services/api';
 import { Client } from '../types';
@@ -16,12 +15,24 @@ const ClientsList: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
 
-    const fetchClients = useCallback(async () => {
+    useEffect(() => {
+        const timerId = setTimeout(() => {
+            setDebouncedSearchTerm(searchTerm);
+        }, 500); // 500ms de retraso
+
+        return () => {
+            clearTimeout(timerId);
+        };
+    }, [searchTerm]);
+
+    const fetchClients = useCallback(async (search: string) => {
         try {
             setLoading(true);
             setError(null);
-            const data = await getClients();
+            const data = await getClients(search);
             setClients(data);
         } catch (err) {
             setError(`No se pudieron cargar los clientes: ${getErrorMessage(err)}`);
@@ -32,8 +43,8 @@ const ClientsList: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        fetchClients();
-    }, [fetchClients]);
+        fetchClients(debouncedSearchTerm);
+    }, [fetchClients, debouncedSearchTerm]);
 
     const handleOpenModal = (client: Client) => {
         setSelectedClient(client);
@@ -47,7 +58,7 @@ const ClientsList: React.FC = () => {
 
     const handleSave = () => {
         handleCloseModal();
-        fetchClients();
+        fetchClients(debouncedSearchTerm);
     };
 
     const handleDeleteRequest = (client: Client) => {
@@ -59,7 +70,7 @@ const ClientsList: React.FC = () => {
         if (!clientToDelete) return;
         try {
             await deleteClient(clientToDelete.id);
-            fetchClients();
+            fetchClients(debouncedSearchTerm);
         } catch (err) {
             alert(`No se pudo eliminar el cliente: ${getErrorMessage(err)}`);
         } finally {
@@ -73,43 +84,69 @@ const ClientsList: React.FC = () => {
         setClientToDelete(null);
     };
 
-
-    if (loading) return <div className="flex justify-center items-center h-full"><Spinner /></div>;
-    if (error) return <p className="text-red-500 text-center">{error}</p>;
-
     return (
         <>
+            <div className="mb-4">
+                 <div className="relative w-full max-w-md">
+                    <input
+                        type="text"
+                        placeholder="Buscar por nombre, email, teléfono o agente..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full bg-secondary p-2 pl-10 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary"
+                        aria-label="Buscar clientes"
+                    />
+                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-text-secondary">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
             <div className="bg-card p-6 rounded-lg shadow-lg">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead className="border-b border-border">
-                            <tr>
-                                <th className="p-4">Nombre</th>
-                                <th className="p-4">Email</th>
-                                <th className="p-4">Teléfono</th>
-                                <th className="p-4">Fecha de Alta</th>
-                                <th className="p-4">Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {clients.map(client => (
-                                <tr key={client.id} className="border-b border-border hover:bg-secondary">
-                                    <td className="p-4 font-medium">{client.nombre}</td>
-                                    <td className="p-4 text-text-secondary">{client.email}</td>
-                                    <td className="p-4 text-text-secondary">{client.telefono}</td>
-                                    <td className="p-4 text-text-secondary">{new Date(client.created_at).toLocaleDateString()}</td>
-                                    <td className="p-4 space-x-2 whitespace-nowrap">
-                                        <button onClick={() => handleOpenModal(client)} className="text-accent hover:underline">Editar</button>
-                                        {profile?.rol === 'ADMIN' && (
-                                            <button onClick={() => handleDeleteRequest(client)} className="text-red-500 hover:underline">Eliminar</button>
-                                        )}
-                                    </td>
+                    {loading ? (
+                        <div className="flex justify-center items-center h-64"><Spinner /></div>
+                    ) : error ? (
+                        <p className="text-red-500 text-center col-span-full">{error}</p>
+                    ) : (
+                        <table className="w-full text-left">
+                            <thead className="border-b border-border">
+                                <tr>
+                                    <th className="p-4">Nombre</th>
+                                    <th className="p-4">Email</th>
+                                    <th className="p-4">Teléfono</th>
+                                    <th className="p-4">Agente Asignado</th>
+                                    <th className="p-4">Fecha de Alta</th>
+                                    <th className="p-4">Acciones</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                    {clients.length === 0 && (
-                        <p className="text-center p-8 text-text-secondary">No se encontraron clientes. Los leads ganados aparecerán aquí.</p>
+                            </thead>
+                            <tbody>
+                                {clients.map(client => (
+                                    <tr key={client.id} className="border-b border-border hover:bg-secondary">
+                                        <td className="p-4 font-medium">{client.nombre}</td>
+                                        <td className="p-4 text-text-secondary">{client.email}</td>
+                                        <td className="p-4 text-text-secondary">{client.telefono}</td>
+                                        <td className="p-4 text-text-secondary">{client.profiles?.nombre || 'No asignado'}</td>
+                                        <td className="p-4 text-text-secondary">{new Date(client.created_at).toLocaleDateString()}</td>
+                                        <td className="p-4 space-x-2 whitespace-nowrap">
+                                            <button onClick={() => handleOpenModal(client)} className="text-accent hover:underline">Editar</button>
+                                            {profile?.rol === 'ADMIN' && (
+                                                <button onClick={() => handleDeleteRequest(client)} className="text-red-500 hover:underline">Eliminar</button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                    {!loading && clients.length === 0 && (
+                         <p className="text-center p-8 text-text-secondary">
+                            {debouncedSearchTerm
+                                ? `No se encontraron clientes para "${debouncedSearchTerm}".`
+                                : 'No se encontraron clientes. Los leads ganados aparecerán aquí.'
+                            }
+                        </p>
                     )}
                 </div>
             </div>

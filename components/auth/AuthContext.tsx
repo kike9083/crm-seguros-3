@@ -1,6 +1,6 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { getSession, onAuthStateChange, signOut, getErrorMessage } from '../../services/api';
+import { getSession, onAuthStateChange, getProfile, signOut, getErrorMessage } from '../../services/api';
 import { Profile } from '../../types';
 import Spinner from '../Spinner';
 
@@ -25,63 +25,66 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const handleUserProfile = (currentUser: User) => {
-        const { nombre, rol } = currentUser.user_metadata;
-        if (nombre && rol) {
-            setProfile({ id: currentUser.id, nombre, rol });
-        } else {
-            const errorMsg = `Los metadatos del perfil (nombre, rol) faltan en el token de usuario. Contacte al administrador para solucionar este problema.`;
-            console.error(errorMsg + ` User ID: ${currentUser.id}`);
-            throw new Error(errorMsg);
-        }
-    };
-
     useEffect(() => {
-        const fetchSessionAndProfile = async () => {
+        setLoading(true);
+        setError(null);
+        
+        const fetchAndSetProfile = async (session: Session | null) => {
             try {
-                setLoading(true);
-                setError(null);
-                const currentSession = await getSession();
-                setSession(currentSession);
-                const currentUser = currentSession?.user ?? null;
+                setSession(session);
+                const currentUser = session?.user ?? null;
                 setUser(currentUser);
-
+    
                 if (currentUser) {
-                    handleUserProfile(currentUser);
+                    const profileData = await getProfile(currentUser.id);
+                    if (profileData) {
+                        setProfile(profileData);
+                    } else {
+                        // This case can happen if the DB trigger for profile creation failed.
+                        // We'll rely on the user_metadata as a fallback, but log a warning.
+                        console.warn(`No se pudo encontrar un perfil para el usuario ${currentUser.id}. Usando user_metadata como respaldo.`);
+                        const { nombre, rol, team_id } = currentUser.user_metadata;
+                        if (nombre && rol) {
+                            setProfile({ id: currentUser.id, nombre, rol, team_id });
+                        } else {
+                            throw new Error('Los metadatos del usuario también están incompletos. No se puede establecer el perfil del usuario.');
+                        }
+                    }
                 } else {
                     setProfile(null);
                 }
             } catch (err) {
-                console.error("Critical error fetching session:", err);
-                setError(`Error al cargar la sesión: ${getErrorMessage(err)}`);
+                // FIX: Log the full error object for better debugging, instead of just the message string.
+                console.error("Error al establecer la sesión y el perfil:", err);
+                // Si hay un error, borramos todo para forzar la salida.
+                setProfile(null); 
+                setUser(null);
+                setSession(null);
+                setError(`Error al cargar el perfil de usuario: ${getErrorMessage(err)}`);
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchSessionAndProfile();
-
-        // FIX: The onAuthStateChange wrapper in api.ts returns the subscription directly, not an object with a `data` property.
-        // The callback signature was also corrected to accept only one argument (the session), as defined in the wrapper.
-        const subscription = onAuthStateChange(async (newSession) => {
-             try {
-                setLoading(true);
-                setError(null);
-                const newUser = newSession?.user ?? null;
-                setUser(newUser);
-                setSession(newSession);
-                
-                if (newUser) {
-                    handleUserProfile(newUser);
-                } else {
-                    setProfile(null);
-                }
-            } catch (err) {
-                console.error("Critical error on auth state change:", err);
-                setError(`Error al actualizar el estado de autenticación: ${getErrorMessage(err)}`);
-            } finally {
+        // Fetch initial session
+        getSession()
+            .then(initialSession => {
+                fetchAndSetProfile(initialSession);
+            })
+            .catch(err => {
+                console.error("Error al obtener la sesión inicial:", err);
+                setError(`Error al obtener la sesión inicial: ${getErrorMessage(err)}`);
                 setLoading(false);
-            }
+            });
+
+        // Listen for auth changes
+        // FIX: The onAuthStateChange wrapper from api.ts returns the subscription object directly
+        // and its callback only accepts a single `session` argument. The previous implementation
+        // incorrectly tried to destructure a `data` property and passed a callback with two arguments.
+        const subscription = onAuthStateChange((session) => {
+            // Cuando el estado de autenticación cambia, podemos estar cargando de nuevo.
+            setLoading(true);
+            fetchAndSetProfile(session);
         });
 
         return () => {
@@ -108,7 +111,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     <h2 className="text-2xl font-bold text-red-500 mb-4">Ocurrió un Error Crítico</h2>
                     <p className="text-text-secondary mb-6">{error}</p>
                     <button
-                        onClick={() => signOut()}
+                        onClick={() => signOut().then(() => setError(null))}
                         className="w-full bg-primary hover:bg-accent text-white font-bold py-3 px-4 rounded-lg transition-colors"
                     >
                         Cerrar Sesión e Intentar de Nuevo

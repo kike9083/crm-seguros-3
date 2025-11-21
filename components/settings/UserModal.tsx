@@ -1,26 +1,27 @@
-
 import React, { useState } from 'react';
 import { createNewUser, getErrorMessage } from '../../services/api';
-import { UserRole } from '../../types';
+import { UserRole, Team } from '../../types';
 
 interface UserModalProps {
     onClose: () => void;
     onSave: () => void;
+    teams: Team[];
 }
 
-const UserModal: React.FC<UserModalProps> = ({ onClose, onSave }) => {
+const UserModal: React.FC<UserModalProps> = ({ onClose, onSave, teams }) => {
     const [formData, setFormData] = useState({
         nombre: '',
         email: '',
         password: '',
         rol: 'AGENTE' as UserRole,
+        team_id: null as string | null,
     });
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+        setFormData(prev => ({ ...prev, [name]: value === 'null' ? null : value }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -29,11 +30,13 @@ const UserModal: React.FC<UserModalProps> = ({ onClose, onSave }) => {
         setError(null);
         
         try {
-            await createNewUser(formData.email, formData.password, formData.nombre, formData.rol);
-            alert('Usuario creado exitosamente.');
+            await createNewUser(formData.email, formData.password, formData.nombre, formData.rol, formData.team_id);
+            alert('Usuario creado exitosamente. Recibirá un correo de confirmación.');
             onSave();
         } catch (err) {
-            setError(`Error al crear el usuario: ${getErrorMessage(err)}`);
+            const message = `Error al crear el usuario: ${getErrorMessage(err)}`;
+            setError(message);
+            alert(message);
             console.error(err);
         } finally {
             setIsSaving(false);
@@ -58,12 +61,23 @@ const UserModal: React.FC<UserModalProps> = ({ onClose, onSave }) => {
                         <input id="password" type="password" name="password" value={formData.password} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required minLength={6}/>
                          <p className="text-xs text-text-secondary mt-1">Mínimo 6 caracteres.</p>
                     </div>
-                    <div>
-                        <label htmlFor="rol" className="block text-sm font-medium text-text-secondary mb-1">Rol</label>
-                        <select id="rol" name="rol" value={formData.rol} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary">
-                            <option value="AGENTE">Agente</option>
-                            <option value="ADMIN">Administrador</option>
-                        </select>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label htmlFor="rol" className="block text-sm font-medium text-text-secondary mb-1">Rol</label>
+                            <select id="rol" name="rol" value={formData.rol} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary">
+                                <option value="AGENTE">Agente</option>
+                                <option value="ADMIN">Administrador</option>
+                            </select>
+                        </div>
+                        <div>
+                             <label htmlFor="team_id" className="block text-sm font-medium text-text-secondary mb-1">Equipo</label>
+                            <select id="team_id" name="team_id" value={formData.team_id || 'null'} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary">
+                                <option value="null">Sin equipo</option>
+                                {teams.map(team => (
+                                    <option key={team.id} value={team.id}>{team.name}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
 
                     {error && <p className="text-red-500 mt-4 text-sm">{error}</p>}
