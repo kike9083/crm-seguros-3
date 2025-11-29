@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { signOut, getErrorMessage } from '../services/api';
+import { signOut } from '../services/api';
 import { Profile } from '../types';
 
 interface HeaderProps {
@@ -13,21 +14,16 @@ const viewTitles: { [key: string]: string } = {
     clients: 'Clientes',
     tasks: 'Tareas y Seguimientos',
     policies: 'Pólizas',
-    products: 'Gestión de Productos',
+    products: 'Catálogo de Productos',
     settings: 'Configuración',
     reports: 'Reportes',
-    help: 'Ayuda y Guía',
+    guide: 'Guía de Uso',
 };
 
 const Header: React.FC<HeaderProps> = ({ currentView, profile }) => {
     
     const handleSignOut = async () => {
-        try {
-            await signOut();
-        } catch (err) {
-            console.error("Error al cerrar sesión:", err);
-            alert(`No se pudo cerrar la sesión: ${getErrorMessage(err)}`);
-        }
+        await signOut();
     }
 
     return (

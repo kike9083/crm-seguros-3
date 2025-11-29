@@ -10,12 +10,12 @@ import ClientsList from './components/ClientsList';
 import TasksBoard from './components/TasksBoard';
 import PoliciesList from './components/PoliciesList';
 import Settings from './components/settings/Settings';
+import ProductsList from './components/ProductsList';
 import { Profile } from './types';
 import Reports from './components/Reports';
-import HelpGuide from './components/HelpGuide';
-import ProductsList from './components/ProductsList';
+import Guide from './components/Guide';
 
-type View = 'dashboard' | 'pipeline' | 'clients' | 'tasks' | 'policies' | 'products' | 'settings' | 'reports' | 'help';
+type View = 'dashboard' | 'pipeline' | 'clients' | 'tasks' | 'policies' | 'products' | 'settings' | 'reports' | 'guide';
 
 interface MainAppProps {
     profile: Profile;
@@ -42,8 +42,8 @@ const MainApp: React.FC<MainAppProps> = ({ profile }) => {
                 return <Settings />;
             case 'reports':
                 return <Reports />;
-            case 'help':
-                return <HelpGuide />;
+            case 'guide':
+                return <Guide />;
             default:
                 return <Dashboard />;
         }

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getProducts, deleteProduct, getErrorMessage } from '../services/api';
 import { Product } from '../types';
@@ -17,6 +18,8 @@ const ProductsList: React.FC = () => {
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [productToDelete, setProductToDelete] = useState<Product | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
+
+    const isAdmin = profile?.rol === 'ADMIN';
 
     const fetchProducts = useCallback(async () => {
         try {
@@ -106,7 +109,7 @@ const ProductsList: React.FC = () => {
                         </svg>
                     </div>
                 </div>
-                {profile?.rol === 'ADMIN' && (
+                {isAdmin && (
                     <button
                         onClick={() => handleOpenModal(null)}
                         className="flex items-center bg-primary hover:bg-accent text-white font-bold py-2 px-4 rounded-lg transition-colors"
@@ -126,7 +129,7 @@ const ProductsList: React.FC = () => {
                                 <th className="p-4">Categoría</th>
                                 <th className="p-4">% Comisión</th>
                                 <th className="p-4">Activo</th>
-                                {profile?.rol === 'ADMIN' && <th className="p-4">Acciones</th>}
+                                {isAdmin && <th className="p-4">Acciones</th>}
                             </tr>
                         </thead>
                         <tbody>
@@ -134,14 +137,14 @@ const ProductsList: React.FC = () => {
                                 <tr key={product.id} className="border-b border-border hover:bg-secondary">
                                     <td className="p-4 font-medium">{product.nombre}</td>
                                     <td className="p-4 text-text-secondary">{product.aseguradora}</td>
-                                    <td className="p-4 text-text-secondary capitalize">{product.categoria}</td>
+                                    <td className="p-4 text-text-secondary">{product.categoria}</td>
                                     <td className="p-4 text-text-secondary">{product.comision_porcentaje}%</td>
                                     <td className="p-4">
                                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${product.activo ? 'bg-green-500 text-white' : 'bg-gray-500 text-white'}`}>
                                             {product.activo ? 'Sí' : 'No'}
                                         </span>
                                     </td>
-                                    {profile?.rol === 'ADMIN' && (
+                                    {isAdmin && (
                                         <td className="p-4 space-x-2">
                                             <button onClick={() => handleOpenModal(product)} className="text-accent hover:underline">Editar</button>
                                             <button onClick={() => handleDeleteRequest(product)} className="text-red-500 hover:underline">Eliminar</button>

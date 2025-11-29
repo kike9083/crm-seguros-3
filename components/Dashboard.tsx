@@ -1,125 +1,185 @@
 
 import React, { useState, useEffect } from 'react';
-import { getDashboardStats, getTasks, getLeadsByStatus, getErrorMessage } from '../services/api';
-import { Task } from '../types';
-import { LEAD_STATUSES, STATUS_COLORS } from '../constants';
+import { getTasks, getLeads, getPolicies, getErrorMessage, getMonthlyGoal, saveMonthlyGoal } from '../services/api';
+import { Task, Lead, Policy, MonthlyGoal } from '../types';
 import Spinner from './Spinner';
+import CogIcon from './icons/CogIcon';
 
-interface Stats {
-    leads: number;
-    tasks: number;
-    policies: number;
-    commissions: number;
-}
-interface PipelineData {
-    [key: string]: number;
+// Tipos auxiliares para contadores operativos
+interface OperationalStats {
+    pendingMeetings: number;
+    contactsMade: number;
+    interestedLeads: number;
+    meetingsThisWeek: number;
 }
 
-const StatCard: React.FC<{ title: string; value: string; icon: React.ReactNode }> = ({ title, value, icon }) => (
-    <div className="bg-card p-6 rounded-lg shadow-lg flex items-center space-x-4">
-        <div className="bg-primary p-3 rounded-full">
-            {icon}
+// Modal para configurar metas
+const GoalSettingModal: React.FC<{ 
+    isOpen: boolean; 
+    onClose: () => void; 
+    currentGoal: MonthlyGoal; 
+    onSave: (goal: MonthlyGoal) => void 
+}> = ({ isOpen, onClose, currentGoal, onSave }) => {
+    const [formData, setFormData] = useState<MonthlyGoal>(currentGoal);
+    const [isSaving, setIsSaving] = useState(false);
+
+    useEffect(() => {
+        setFormData(currentGoal);
+    }, [currentGoal]);
+
+    if (!isOpen) return null;
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setFormData({ ...formData, [e.target.name]: Number(e.target.value) });
+    };
+
+    const handleSaveClick = async () => {
+        setIsSaving(true);
+        try {
+            await onSave(formData);
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
+            <div className="bg-card rounded-lg shadow-2xl p-6 w-full max-w-sm">
+                <h2 className="text-xl font-bold mb-4">Configurar Metas Mensuales ($)</h2>
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-text-secondary mb-1">Meta Vida</label>
+                        <input type="number" name="vida" value={formData.vida} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-text-secondary mb-1">Meta AP (Accidentes Personales)</label>
+                        <input type="number" name="ap" value={formData.ap} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-text-secondary mb-1">Meta Salud (GMM)</label>
+                        <input type="number" name="salud" value={formData.salud} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
+                    </div>
+                </div>
+                <div className="mt-6 flex justify-end space-x-3">
+                    <button onClick={onClose} className="text-text-secondary hover:text-white px-3 py-2" disabled={isSaving}>Cancelar</button>
+                    <button onClick={handleSaveClick} className="bg-primary hover:bg-accent text-white font-bold py-2 px-4 rounded" disabled={isSaving}>
+                        {isSaving ? 'Guardando...' : 'Guardar'}
+                    </button>
+                </div>
+            </div>
         </div>
+    );
+};
+
+const StatCard: React.FC<{ title: string; value: string | number; subtext?: string; color?: string }> = ({ title, value, subtext, color = "bg-card" }) => (
+    <div className={`${color} p-4 rounded-lg shadow-lg border border-border flex flex-col justify-between h-32`}>
+        <p className="text-text-secondary text-sm font-medium uppercase tracking-wider">{title}</p>
         <div>
-            <p className="text-text-secondary text-sm">{title}</p>
             <p className="text-3xl font-bold text-text-primary">{value}</p>
+            {subtext && <p className="text-xs text-text-secondary mt-1">{subtext}</p>}
         </div>
     </div>
 );
 
-const UpcomingTask: React.FC<{ task: Task }> = ({ task }) => {
-    // Handle cases where related leads/clients can be an array.
-    const getRelatedName = (relation: { nombre: string } | { nombre: string }[] | null | undefined): string | null => {
-        if (!relation) return null;
-        if (Array.isArray(relation)) {
-            return relation.length > 0 ? relation[0].nombre : null;
-        }
-        return relation.nombre;
-    };
-     const contactName = getRelatedName(task.leads) || getRelatedName(task.clients) || 'N/A';
-     const dueDate = new Date(task.fecha_vencimiento);
-     const now = new Date();
-     const isDueSoon = (dueDate.getTime() - now.getTime()) / (1000 * 3600 * 24) < 3;
-     const dateColor = isDueSoon ? 'text-yellow-400' : 'text-text-secondary';
+const ProgressBar: React.FC<{ label: string; current: number; target: number; colorClass: string }> = ({ label, current, target, colorClass }) => {
+    const percentage = target > 0 ? Math.min((current / target) * 100, 100) : 0;
+    
     return (
-        <div className="flex justify-between items-center py-3 border-b border-border">
-            <div>
-                <p className="font-semibold">{task.descripcion}</p>
-                <p className="text-sm text-text-secondary">Para: {contactName}</p>
+        <div className="mb-4">
+            <div className="flex justify-between mb-1">
+                <span className="text-sm font-medium text-text-primary">{label}</span>
+                <span className="text-sm font-medium text-text-secondary">${current.toLocaleString()} / ${target.toLocaleString()}</span>
             </div>
-            <p className={`text-sm font-medium ${dateColor}`}>{dueDate.toLocaleDateString()}</p>
+            <div className="w-full bg-gray-700 rounded-full h-2.5">
+                <div className={`h-2.5 rounded-full ${colorClass}`} style={{ width: `${percentage}%` }}></div>
+            </div>
         </div>
-    )
+    );
 };
 
-const PipelineChart: React.FC<{ data: PipelineData }> = ({ data }) => {
-    // FIX: Operator '+' cannot be applied to types 'unknown' and 'number'.
-    // Explicitly type the accumulator `sum` to `number` to fix type inference issue.
-    // By using the generic parameter on `reduce`, we ensure `total` is correctly typed as a number.
-    const total = Object.values(data).reduce<number>((sum, count) => sum + Number(count), 0);
-    if (total === 0) return <p className="text-text-secondary">No hay datos de leads para mostrar.</p>;
-
-    return (
-        <div className="w-full bg-secondary p-4 rounded-lg">
-             <div className="flex w-full h-8 rounded-full overflow-hidden">
-                {LEAD_STATUSES.map(status => {
-                    const count = data[status] || 0;
-                    if (count === 0) return null;
-                    // FIX: The right-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
-                    // This is fixed by ensuring `total` is correctly calculated as a number above.
-                    const percentage = (count / total) * 100;
-                    return (
-                        <div key={status} className={`${STATUS_COLORS[status]}`} style={{ width: `${percentage}%` }} title={`${status}: ${count}`}></div>
-                    )
-                })}
-            </div>
-            <div className="flex flex-wrap justify-center mt-4 gap-x-4 gap-y-2">
-                {LEAD_STATUSES.map(status => {
-                     const count = data[status] || 0;
-                     if (count === 0) return null;
-                     return (
-                        <div key={status} className="flex items-center text-sm">
-                            <span className={`w-3 h-3 rounded-full mr-2 ${STATUS_COLORS[status]}`}></span>
-                            <span className="text-text-secondary">{status}:</span>
-                            <span className="font-semibold ml-1">{count}</span>
-                        </div>
-                     )
-                })}
-            </div>
-        </div>
-    )
-}
-
-
 const Dashboard: React.FC = () => {
-    const [stats, setStats] = useState<Stats | null>(null);
-    const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
-    const [pipelineData, setPipelineData] = useState<PipelineData>({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [opsStats, setOpsStats] = useState<OperationalStats>({ pendingMeetings: 0, contactsMade: 0, interestedLeads: 0, meetingsThisWeek: 0 });
+    const [tasks, setTasks] = useState<Task[]>([]);
+    
+    // Metas y Ventas Reales
+    const [showGoalModal, setShowGoalModal] = useState(false);
+    const [monthlyGoal, setMonthlyGoal] = useState<MonthlyGoal>({
+        month: new Date().getMonth(),
+        year: new Date().getFullYear(),
+        vida: 0, ap: 0, salud: 0
+    });
+    const [actualSales, setActualSales] = useState({ vida: 0, ap: 0, salud: 0 });
 
     useEffect(() => {
         const fetchData = async () => {
             try {
                 setLoading(true);
-                setError(null);
-                const [statsData, allTasks, pipelineCounts] = await Promise.all([
-                    getDashboardStats(),
-                    getTasks(),
-                    getLeadsByStatus()
-                ]);
-                setStats(statsData);
-                
-                const upcoming = allTasks
-                    .filter(task => task.estatus === 'PENDIENTE')
-                    .sort((a, b) => new Date(a.fecha_vencimiento).getTime() - new Date(b.fecha_vencimiento).getTime())
-                    .slice(0, 5);
-                setUpcomingTasks(upcoming);
+                const currentMonth = new Date().getMonth();
+                const currentYear = new Date().getFullYear();
 
-                setPipelineData(pipelineCounts);
+                const [allTasks, allLeads, allPolicies, savedGoal] = await Promise.all([
+                    getTasks(),
+                    getLeads(),
+                    getPolicies(),
+                    getMonthlyGoal(currentMonth, currentYear)
+                ]);
+
+                // Set goal if exists, otherwise defaults are already 0
+                if (savedGoal) {
+                    setMonthlyGoal(savedGoal);
+                }
+
+                // 1. Cálculos de Operaciones (Parte Superior)
+                const now = new Date();
+                const startOfWeek = new Date(now.setDate(now.getDate() - now.getDay())); // Domingo
+                const endOfWeek = new Date(now.setDate(now.getDate() - now.getDay() + 6));
+                
+                // Reuniones Pendientes: Tareas tipo CITA que no están completadas
+                const pendingMeetings = allTasks.filter(t => t.tipo === 'CITA' && t.estatus !== 'COMPLETADA').length;
+
+                // Personas Contactadas (Actividad): Llamadas/Citas completadas (Log de actividad)
+                const contactsMade = allTasks.filter(t => 
+                    (t.tipo === 'LLAMADA' || t.tipo === 'CITA' || t.tipo === 'WHATSAPP') && t.estatus === 'COMPLETADA'
+                ).length;
+
+                // Interesados / Pendientes: Leads Calificados ("Hot Leads")
+                const interestedLeads = allLeads.filter(l => l.estatus_lead === 'CALIFICADO').length;
+
+                // Citas Agendadas (Semana Actual): Citas con fecha dentro de la semana
+                const meetingsThisWeek = allTasks.filter(t => {
+                    if (t.tipo !== 'CITA') return false;
+                    const tDate = new Date(t.fecha_vencimiento);
+                    return tDate >= startOfWeek && tDate <= endOfWeek;
+                }).length;
+
+                setOpsStats({ pendingMeetings, contactsMade, interestedLeads, meetingsThisWeek });
+                setTasks(allTasks);
+
+                // 2. Cálculo de Ventas Reales vs Metas
+                let salesVida = 0;
+                let salesAP = 0;
+                let salesSalud = 0;
+
+                allPolicies.forEach(p => {
+                    const pDate = new Date(p.created_at); // Usamos created_at como fecha de venta
+                    if (p.estatus_poliza === 'ACTIVA' && pDate.getMonth() === currentMonth && pDate.getFullYear() === currentYear) {
+                         const prodName = Array.isArray(p.products) ? p.products[0]?.nombre : p.products?.nombre;
+                         const prodCat = Array.isArray(p.products) ? p.products[0]?.categoria : p.products?.categoria;
+                         
+                         const category = (prodCat || prodName || '').toLowerCase();
+                         
+                         if (category.includes('vida') || category.includes('life')) salesVida += p.prima_total;
+                         else if (category.includes('ap') || category.includes('accidente') || category.includes('personales')) salesAP += p.prima_total;
+                         else if (category.includes('salud') || category.includes('gmm') || category.includes('médico')) salesSalud += p.prima_total;
+                    }
+                });
+
+                setActualSales({ vida: salesVida, ap: salesAP, salud: salesSalud });
+
             } catch (err) {
-                setError(`No se pudieron cargar los datos del dashboard: ${getErrorMessage(err)}`);
-                console.error(err);
+                setError(`Error cargando datos: ${getErrorMessage(err)}`);
             } finally {
                 setLoading(false);
             }
@@ -128,34 +188,144 @@ const Dashboard: React.FC = () => {
         fetchData();
     }, []);
 
+    const handleSaveGoal = async (goal: MonthlyGoal) => {
+        try {
+            const saved = await saveMonthlyGoal(goal);
+            setMonthlyGoal(saved);
+            setShowGoalModal(false);
+        } catch (err) {
+            alert(`Error al guardar la meta: ${getErrorMessage(err)}`);
+        }
+    };
+
     if (loading) return <div className="flex justify-center items-center h-full"><Spinner /></div>;
     if (error) return <p className="text-red-500 text-center">{error}</p>;
 
+    const upcomingTasks = tasks
+        .filter(task => task.estatus === 'PENDIENTE')
+        .sort((a, b) => new Date(a.fecha_vencimiento).getTime() - new Date(b.fecha_vencimiento).getTime())
+        .slice(0, 5);
+
     return (
-        <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard title="Nuevos Leads" value={String(stats?.leads ?? 0)} icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>} />
-                <StatCard title="Tareas Pendientes" value={String(stats?.tasks ?? 0)} icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>} />
-                <StatCard title="Pólizas Activas" value={String(stats?.policies ?? 0)} icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>} />
-                <StatCard title="Comisiones Estimadas" value={`$${(stats?.commissions ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v.01" /></svg>} />
-            </div>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 bg-card p-6 rounded-lg shadow-lg">
-                     <h2 className="text-xl font-bold mb-4">Progreso del Pipeline</h2>
-                     <PipelineChart data={pipelineData} />
+        <div className="space-y-8 pb-10">
+            {/* Panel de Control Operativo */}
+            <div>
+                <h2 className="text-xl font-bold mb-4 text-text-primary">Actividad Operativa</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <StatCard 
+                        title="Reuniones Pendientes" 
+                        value={opsStats.pendingMeetings} 
+                        subtext="Citas por realizar"
+                        color="bg-secondary"
+                    />
+                    <StatCard 
+                        title="Personas Contactadas" 
+                        value={opsStats.contactsMade} 
+                        subtext="Actividades completadas (Log)"
+                        color="bg-secondary"
+                    />
+                    <StatCard 
+                        title="Interesados (Pendientes)" 
+                        value={opsStats.interestedLeads} 
+                        subtext="Leads en estatus 'Calificado'"
+                        color="bg-indigo-900" 
+                    />
+                    <StatCard 
+                        title="Citas Esta Semana" 
+                        value={opsStats.meetingsThisWeek} 
+                        subtext="Agenda semanal"
+                        color="bg-primary"
+                    />
                 </div>
+            </div>
+
+            {/* Panel de Metas y Ventas */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 bg-card p-6 rounded-lg shadow-lg relative">
+                     <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-xl font-bold">Progreso de Metas Mensuales</h2>
+                        <button 
+                            onClick={() => setShowGoalModal(true)}
+                            className="flex items-center text-sm text-accent hover:text-white transition-colors"
+                        >
+                            <CogIcon className="w-5 h-5 mr-1"/>
+                            Configurar Meta
+                        </button>
+                     </div>
+                     
+                     <div className="space-y-6">
+                        <ProgressBar 
+                            label="Vida" 
+                            current={actualSales.vida} 
+                            target={monthlyGoal.vida} 
+                            colorClass="bg-blue-500" 
+                        />
+                        <ProgressBar 
+                            label="Accidentes Personales (AP)" 
+                            current={actualSales.ap} 
+                            target={monthlyGoal.ap} 
+                            colorClass="bg-yellow-500" 
+                        />
+                        <ProgressBar 
+                            label="Gastos Médicos / Salud" 
+                            current={actualSales.salud} 
+                            target={monthlyGoal.salud} 
+                            colorClass="bg-green-500" 
+                        />
+                     </div>
+
+                     <div className="mt-8 pt-4 border-t border-border grid grid-cols-3 gap-4 text-center">
+                        <div>
+                            <p className="text-xs text-text-secondary">Meta Total</p>
+                            <p className="font-bold text-lg">${(monthlyGoal.vida + monthlyGoal.ap + monthlyGoal.salud).toLocaleString()}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-text-secondary">Venta Real</p>
+                            <p className="font-bold text-lg">${(actualSales.vida + actualSales.ap + actualSales.salud).toLocaleString()}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-text-secondary">Faltante</p>
+                            <p className="font-bold text-lg text-red-400">
+                                ${Math.max(0, (monthlyGoal.vida + monthlyGoal.ap + monthlyGoal.salud) - (actualSales.vida + actualSales.ap + actualSales.salud)).toLocaleString()}
+                            </p>
+                        </div>
+                     </div>
+                </div>
+
                  <div className="bg-card p-6 rounded-lg shadow-lg">
-                    <h2 className="text-xl font-bold mb-4">Próximos Seguimientos</h2>
-                    <div className="space-y-2">
+                    <h2 className="text-xl font-bold mb-4">Próximos Pendientes</h2>
+                    <div className="space-y-3">
                         {upcomingTasks.length > 0 ? (
-                            upcomingTasks.map(task => <UpcomingTask key={task.id} task={task} />)
+                            upcomingTasks.map(task => {
+                                const contactName = Array.isArray(task.leads) ? task.leads[0]?.nombre : task.leads?.nombre || 
+                                                    (Array.isArray(task.clients) ? task.clients[0]?.nombre : task.clients?.nombre) || 'N/A';
+                                
+                                return (
+                                    <div key={task.id} className="py-2 border-b border-border last:border-0">
+                                        <div className="flex justify-between">
+                                            <span className="font-semibold text-sm">{task.descripcion}</span>
+                                            <span className="text-xs text-text-secondary">{new Date(task.fecha_vencimiento).toLocaleDateString()}</span>
+                                        </div>
+                                        <p className="text-xs text-text-secondary mt-1">Con: {contactName}</p>
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full mt-1 inline-block ${task.prioridad === 'ALTA' ? 'bg-red-900 text-red-200' : 'bg-gray-700'}`}>
+                                            {task.prioridad}
+                                        </span>
+                                    </div>
+                                )
+                            })
                         ) : (
-                            <p className="text-text-secondary">No hay tareas pendientes.</p>
+                            <p className="text-text-secondary text-sm">No hay tareas pendientes próximas.</p>
                         )}
                     </div>
                 </div>
             </div>
+
+            <GoalSettingModal 
+                isOpen={showGoalModal} 
+                onClose={() => setShowGoalModal(false)} 
+                currentGoal={monthlyGoal} 
+                onSave={handleSaveGoal} 
+            />
         </div>
     );
 };

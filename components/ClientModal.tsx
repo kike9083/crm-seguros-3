@@ -1,11 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { updateClient, getFiles, uploadFile, createSignedUrl, getErrorMessage, deleteFile, getAllProfiles } from '../services/api';
+import { updateClient, getFiles, uploadFile, getPublicUrl, getErrorMessage, getAllProfiles, sanitizeFileName } from '../services/api';
 import { Client, FileObject, Profile } from '../types';
 import Spinner from './Spinner';
 import PlusIcon from './icons/PlusIcon';
-import ArrowDownTrayIcon from './icons/ArrowDownTrayIcon';
-import TrashIcon from './icons/TrashIcon';
-import ConfirmationModal from './ConfirmationModal';
 import { useAuth } from './auth/AuthContext';
 
 interface ClientModalProps {
@@ -15,15 +12,21 @@ interface ClientModalProps {
 }
 
 const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) => {
-    const { profile } = useAuth();
+    const { profile, user } = useAuth();
+    const isAdmin = profile?.rol === 'ADMIN';
+    const [agents, setAgents] = useState<Profile[]>([]);
+
+    // Use string | number for numeric fields to handle empty states better in inputs
     const [formData, setFormData] = useState({
         nombre: '',
         email: '',
         telefono: '',
         fecha_nacimiento: '',
-        agent_id: ''
+        agent_id: '',
+        ocupacion: '',
+        ingresos_mensuales: 0 as string | number,
+        polizas_externas: ''
     });
-    const [allAgents, setAllAgents] = useState<Profile[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -32,11 +35,6 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
     const [isUploading, setIsUploading] = useState(false);
     const [fileError, setFileError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [downloadingFileId, setDownloadingFileId] = useState<string | null>(null);
-    const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
-    const [fileToDelete, setFileToDelete] = useState<FileObject | null>(null);
-    const [isDeleting, setIsDeleting] = useState(false);
-
 
     const fetchFiles = useCallback(async () => {
         if (!client) return;
@@ -54,11 +52,15 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
     }, [client]);
 
     useEffect(() => {
-        if (profile?.rol === 'ADMIN') {
-            getAllProfiles()
-                .then(setAllAgents)
-                .catch(err => console.error("Failed to fetch agents", err));
-        }
+        const fetchAgents = async () => {
+            try {
+                const allProfiles = await getAllProfiles();
+                setAgents(allProfiles.filter(p => p.rol === 'AGENTE'));
+            } catch (err) {
+                console.error("Error fetching agents:", err);
+            }
+        };
+        fetchAgents();
 
         if (client) {
             setFormData({
@@ -66,13 +68,16 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
                 email: client.email || '',
                 telefono: client.telefono || '',
                 fecha_nacimiento: client.fecha_nacimiento ? client.fecha_nacimiento.split('T')[0] : '',
-                agent_id: client.agent_id || ''
+                agent_id: client.agent_id || (isAdmin ? '' : (user?.id || '')),
+                ocupacion: client.ocupacion || '',
+                ingresos_mensuales: client.ingresos_mensuales || 0,
+                polizas_externas: client.polizas_externas || ''
             });
             fetchFiles();
         }
-    }, [client, fetchFiles, profile]);
+    }, [client, fetchFiles, isAdmin, user]);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
     };
@@ -84,7 +89,9 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
         setIsUploading(true);
         setFileError(null);
         try {
-            const filePath = `${client.id}/${file.name}`;
+            const sanitizedName = sanitizeFileName(file.name);
+            const filePath = `${client.id}/${sanitizedName}`;
+            
             await uploadFile('client_files', filePath, file);
             await fetchFiles();
         } catch (err) {
@@ -101,60 +108,26 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
     const handleButtonClick = () => {
         fileInputRef.current?.click();
     };
-    
-    const handleDownload = async (file: FileObject) => {
-        if (!client) return;
-        setDownloadingFileId(file.id);
-        try {
-            const path = `${client.id}/${file.name}`;
-            const signedUrl = await createSignedUrl('client_files', path);
-            window.open(signedUrl, '_blank');
-        } catch (err) {
-            alert(`No se pudo generar el enlace de descarga: ${getErrorMessage(err)}`);
-        } finally {
-            setDownloadingFileId(null);
-        }
-    };
-
-    const handleDeleteRequest = (file: FileObject) => {
-        setFileToDelete(file);
-        setIsConfirmDeleteOpen(true);
-    };
-
-    const handleConfirmDelete = async () => {
-        if (!fileToDelete || !client) return;
-        setIsDeleting(true);
-        setFileError(null);
-        try {
-            const path = `${client.id}/${fileToDelete.name}`;
-            await deleteFile('client_files', path);
-            await fetchFiles();
-        } catch (err) {
-            setFileError(`Error al eliminar el archivo: ${getErrorMessage(err)}`);
-        } finally {
-            setIsDeleting(false);
-            setIsConfirmDeleteOpen(false);
-            setFileToDelete(null);
-        }
-    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
         setError(null);
         
+        // Prepare data. Convert empty strings to null implicitly via api.ts logic or explicitly undefined
         const dataToUpdate = {
             ...formData,
-            fecha_nacimiento: formData.fecha_nacimiento || null
+            // Convert undefined/empty to null is handled in api.ts if we pass empty string. 
+            // We keep them as strings here to match the interface expectations (string | undefined)
+            // ingresos_mensuales needs to be a number
+            ingresos_mensuales: Number(formData.ingresos_mensuales)
         };
 
         try {
             await updateClient(client.id, dataToUpdate);
             onSave();
         } catch (err) {
-            const message = `Error al guardar el cliente: ${getErrorMessage(err)}`;
-            setError(message);
-            alert(message);
+            setError(`Error al guardar el cliente: ${getErrorMessage(err)}`);
             console.error(err);
         } finally {
             setIsSaving(false);
@@ -162,138 +135,132 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
     };
     
     return (
-        <>
-            <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
-                <div className="bg-card rounded-lg shadow-2xl p-8 w-full max-w-lg max-h-[90vh] overflow-y-auto">
-                    <h2 className="text-2xl font-bold mb-6">Editar Cliente</h2>
-                    <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
+            <div className="bg-card rounded-lg shadow-2xl p-8 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                <h2 className="text-2xl font-bold mb-6">Editar Cliente</h2>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                        <label htmlFor="nombre" className="block text-sm font-medium text-text-secondary mb-1">Nombre Completo</label>
+                        <input id="nombre" name="nombre" value={formData.nombre} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label htmlFor="nombre" className="block text-sm font-medium text-text-secondary mb-1">Nombre Completo</label>
-                            <input id="nombre" name="nombre" value={formData.nombre} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required />
+                            <label htmlFor="email" className="block text-sm font-medium text-text-secondary mb-1">Email</label>
+                            <input id="email" name="email" value={formData.email} onChange={handleChange} type="email" className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required />
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label htmlFor="email" className="block text-sm font-medium text-text-secondary mb-1">Email</label>
-                                <input id="email" name="email" value={formData.email} onChange={handleChange} type="email" className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required />
-                            </div>
-                            <div>
-                                <label htmlFor="telefono" className="block text-sm font-medium text-text-secondary mb-1">Teléfono</label>
-                                <input id="telefono" name="telefono" value={formData.telefono} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
-                            </div>
+                        <div>
+                            <label htmlFor="telefono" className="block text-sm font-medium text-text-secondary mb-1">Teléfono</label>
+                            <input id="telefono" name="telefono" value={formData.telefono} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label htmlFor="fecha_nacimiento" className="block text-sm font-medium text-text-secondary mb-1">Fecha de Nacimiento</label>
-                                <input id="fecha_nacimiento" name="fecha_nacimiento" type="date" value={formData.fecha_nacimiento} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
-                            </div>
-                             <div>
-                                <label htmlFor="agent_id" className="block text-sm font-medium text-text-secondary mb-1">Agente Asignado</label>
-                                {profile?.rol === 'ADMIN' ? (
-                                    <select
-                                        id="agent_id"
-                                        name="agent_id"
-                                        value={formData.agent_id}
-                                        onChange={handleChange}
-                                        className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary"
-                                    >
-                                        <option value="">Sin asignar</option>
-                                        {allAgents.map(agent => (
-                                            <option key={agent.id} value={agent.id}>{agent.nombre}</option>
-                                        ))}
-                                    </select>
-                                ) : (
-                                    <input id="agent_name" name="agent_name" type="text" value={client.profiles?.nombre || 'No asignado'} readOnly className="w-full bg-gray-700 p-2 rounded border border-border focus:outline-none cursor-not-allowed" />
+                    </div>
+                    <div>
+                        <label htmlFor="fecha_nacimiento" className="block text-sm font-medium text-text-secondary mb-1">Fecha de Nacimiento</label>
+                        <input id="fecha_nacimiento" name="fecha_nacimiento" type="date" value={formData.fecha_nacimiento} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label htmlFor="ocupacion" className="block text-sm font-medium text-text-secondary mb-1">Ocupación</label>
+                            <input id="ocupacion" name="ocupacion" value={formData.ocupacion} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Ej. Arquitecto" />
+                        </div>
+                        <div>
+                            <label htmlFor="ingresos_mensuales" className="block text-sm font-medium text-text-secondary mb-1">Ingresos Mensuales ($)</label>
+                            <input id="ingresos_mensuales" name="ingresos_mensuales" type="number" value={formData.ingresos_mensuales} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label htmlFor="polizas_externas" className="block text-sm font-medium text-text-secondary mb-1">Pólizas Externas / Aseguradora Actual</label>
+                        <textarea id="polizas_externas" name="polizas_externas" value={formData.polizas_externas} onChange={handleChange} rows={2} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Ej. Tiene seguro de vida con MetLife, Auto con Qualitas..." />
+                    </div>
+
+                    {isAdmin && (
+                        <div>
+                            <label htmlFor="agent_id" className="block text-sm font-medium text-text-secondary mb-1">Agente Responsable</label>
+                            <select 
+                                id="agent_id" 
+                                name="agent_id" 
+                                value={formData.agent_id} 
+                                onChange={handleChange} 
+                                className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary"
+                            >
+                                <option value="">(Sin asignar)</option>
+                                {agents.map(agent => (
+                                    <option key={agent.id} value={agent.id}>{agent.nombre}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+
+                    {error && <p className="text-red-500 mt-4 text-sm">{error}</p>}
+
+                    <div className="mt-6 border-t border-border pt-4">
+                        <h3 className="text-lg font-medium text-text-primary mb-3 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2"><path strokeLinecap="round" strokeLinejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.122 2.122l7.81-7.81" /></svg>
+                            Archivos del Cliente
+                        </h3>
+                        {isFilesLoading ? (
+                            <div className="flex justify-center p-4"><Spinner /></div>
+                        ) : fileError ? (
+                            <p className="text-red-500 text-sm">{fileError}</p>
+                        ) : (
+                            <div className="space-y-2">
+                                {files.length === 0 && !isUploading && (
+                                    <p className="text-text-secondary text-sm">No hay archivos adjuntos.</p>
+                                )}
+                                {files.map(file => (
+                                    <div key={file.id} className="flex items-center justify-between bg-secondary p-2 rounded">
+                                        <span className="text-sm truncate">{file.name}</span>
+                                        <a
+                                            href={getPublicUrl('client_files', `${client.id}/${file.name}`)}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            download
+                                            className="text-accent hover:underline p-1"
+                                            title="Descargar"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
+                                        </a>
+                                    </div>
+                                ))}
+                                {isUploading && (
+                                    <div className="flex items-center text-sm text-text-secondary">
+                                        <Spinner />
+                                        <span className="ml-2">Subiendo archivo...</span>
+                                    </div>
                                 )}
                             </div>
-                        </div>
-
-                        {error && <p className="text-red-500 mt-4 text-sm">{error}</p>}
-
-                        <div className="mt-6 border-t border-border pt-4">
-                            <h3 className="text-lg font-medium text-text-primary mb-3 flex items-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2"><path strokeLinecap="round" strokeLinejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.122 2.122l7.81-7.81" /></svg>
-                                Archivos del Cliente
-                            </h3>
-                            {isFilesLoading ? (
-                                <div className="flex justify-center p-4"><Spinner /></div>
-                            ) : fileError ? (
-                                <p className="text-red-500 text-sm">{fileError}</p>
-                            ) : (
-                                <div className="space-y-2">
-                                    {files.length === 0 && !isUploading && (
-                                        <p className="text-text-secondary text-sm">No hay archivos adjuntos.</p>
-                                    )}
-                                    {files.map(file => (
-                                        <div key={file.id} className="flex items-center justify-between bg-secondary p-2 rounded">
-                                            <span className="text-sm truncate mr-2">{file.name}</span>
-                                            <div className="flex items-center space-x-2 flex-shrink-0">
-                                                 <button
-                                                    type="button"
-                                                    onClick={() => handleDownload(file)}
-                                                    disabled={downloadingFileId === file.id}
-                                                    className="text-accent hover:underline p-1 disabled:opacity-50"
-                                                    title="Descargar"
-                                                >
-                                                    {downloadingFileId === file.id ? <Spinner/> : <ArrowDownTrayIcon className="w-5 h-5"/>}
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleDeleteRequest(file)}
-                                                    className="text-red-500 hover:text-red-400 p-1"
-                                                    title="Eliminar"
-                                                >
-                                                    <TrashIcon className="w-5 h-5"/>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {isUploading && (
-                                        <div className="flex items-center text-sm text-text-secondary">
-                                            <Spinner />
-                                            <span className="ml-2">Subiendo archivo...</span>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                            <div className="mt-4">
-                                <input
-                                    type="file"
-                                    ref={fileInputRef}
-                                    onChange={handleFileChange}
-                                    className="hidden"
-                                    disabled={isUploading}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={handleButtonClick}
-                                    disabled={isUploading}
-                                    className="flex items-center text-sm bg-secondary hover:bg-gray-600 text-white font-bold py-2 px-3 rounded-lg transition-colors disabled:opacity-50"
-                                >
-                                    <PlusIcon className="w-4 h-4 mr-2" />
-                                    Añadir Archivo
-                                </button>
-                            </div>
-                        </div>
-
-
-                        <div className="mt-6 flex justify-end space-x-4">
-                            <button type="button" onClick={onClose} className="bg-secondary hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition-colors" disabled={isSaving}>Cancelar</button>
-                            <button type="submit" className="bg-primary hover:bg-accent text-white font-bold py-2 px-4 rounded transition-colors" disabled={isSaving}>
-                                {isSaving ? 'Guardando...' : 'Guardar Cambios'}
+                        )}
+                        <div className="mt-4">
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={handleFileChange}
+                                className="hidden"
+                                disabled={isUploading}
+                            />
+                            <button
+                                type="button"
+                                onClick={handleButtonClick}
+                                disabled={isUploading}
+                                className="flex items-center text-sm bg-secondary hover:bg-gray-600 text-white font-bold py-2 px-3 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                                <PlusIcon className="w-4 h-4 mr-2" />
+                                Añadir Archivo
                             </button>
                         </div>
-                    </form>
-                </div>
+                    </div>
+
+
+                    <div className="mt-6 flex justify-end space-x-4">
+                        <button type="button" onClick={onClose} className="bg-secondary hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition-colors" disabled={isSaving}>Cancelar</button>
+                        <button type="submit" className="bg-primary hover:bg-accent text-white font-bold py-2 px-4 rounded transition-colors" disabled={isSaving}>
+                            {isSaving ? 'Guardando...' : 'Guardar Cambios'}
+                        </button>
+                    </div>
+                </form>
             </div>
-            <ConfirmationModal
-                isOpen={isConfirmDeleteOpen}
-                title="Confirmar Eliminación de Archivo"
-                message={`¿Estás seguro de que quieres eliminar el archivo "${fileToDelete?.name}"? Esta acción no se puede deshacer.`}
-                onConfirm={handleConfirmDelete}
-                onCancel={() => setIsConfirmDeleteOpen(false)}
-                confirmText={isDeleting ? 'Eliminando...' : 'Eliminar'}
-            />
-        </>
+        </div>
     );
 };
 

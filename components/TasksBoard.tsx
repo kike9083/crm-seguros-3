@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getTasks, updateTask, getErrorMessage } from '../services/api';
-import { Task, TaskStatus } from '../types';
+import { getTasks, updateTask, getErrorMessage, getAllProfiles } from '../services/api';
+import { Task, TaskStatus, Profile } from '../types';
 import { TASK_STATUSES, STATUS_COLORS } from '../constants';
 import Spinner from './Spinner';
 import TaskModal from './TaskModal';
@@ -11,7 +11,8 @@ const TaskCard: React.FC<{
     onClick: () => void;
     onDragStart: (e: React.DragEvent<HTMLDivElement>, taskId: number) => void;
     isDragging: boolean;
-}> = ({ task, onClick, onDragStart, isDragging }) => {
+    agentName: string | null;
+}> = ({ task, onClick, onDragStart, isDragging, agentName }) => {
     const getRelatedName = (relation: { nombre: string } | { nombre: string }[] | null | undefined): string | null => {
         if (!relation) return null;
         if (Array.isArray(relation)) {
@@ -40,6 +41,7 @@ const TaskCard: React.FC<{
             <span className={`mt-2 inline-block px-2 py-1 text-xs font-semibold rounded-full ${task.prioridad === 'ALTA' ? 'bg-red-500 text-white' : task.prioridad === 'MEDIA' ? 'bg-yellow-500 text-black' : 'bg-green-500 text-white'}`}>
                 {task.prioridad}
             </span>
+            {agentName && <div className="mt-2 text-xs text-blue-300">Agente: {agentName}</div>}
         </div>
     );
 };
@@ -51,7 +53,8 @@ const TaskColumn: React.FC<{
     onDrop: (e: React.DragEvent<HTMLDivElement>, status: TaskStatus) => void;
     onDragStart: (e: React.DragEvent<HTMLDivElement>, taskId: number) => void;
     draggedTaskId: number | null;
-}> = ({ status, tasks, onCardClick, onDrop, onDragStart, draggedTaskId }) => {
+    agentMap: Map<string, string>;
+}> = ({ status, tasks, onCardClick, onDrop, onDragStart, draggedTaskId, agentMap }) => {
     const [isDraggedOver, setIsDraggedOver] = useState(false);
     const statusColor = STATUS_COLORS[status] || 'bg-gray-500';
 
@@ -95,6 +98,7 @@ const TaskColumn: React.FC<{
                         onClick={() => onCardClick(task)}
                         onDragStart={onDragStart}
                         isDragging={draggedTaskId === task.id}
+                        agentName={task.agent_id ? agentMap.get(task.agent_id) : null}
                     />
                 ))}
             </div>
@@ -105,20 +109,31 @@ const TaskColumn: React.FC<{
 
 const TasksBoard: React.FC = () => {
     const [tasks, setTasks] = useState<Task[]>([]);
+    const [profiles, setProfiles] = useState<Profile[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [draggedTaskId, setDraggedTaskId] = useState<number | null>(null);
 
-    const fetchTasks = useCallback(async () => {
+    const agentMap = React.useMemo(() => {
+        const map = new Map<string, string>();
+        profiles.forEach(p => map.set(p.id, p.nombre));
+        return map;
+    }, [profiles]);
+
+    const fetchTasksAndProfiles = useCallback(async () => {
         try {
             setLoading(true);
             setError(null);
-            const data = await getTasks();
-            setTasks(data);
+            const [tasksData, profilesData] = await Promise.all([
+                getTasks(),
+                getAllProfiles()
+            ]);
+            setTasks(tasksData);
+            setProfiles(profilesData);
         } catch (err) {
-            setError(`No se pudieron cargar las tareas: ${getErrorMessage(err)}`);
+            setError(`No se pudieron cargar las tareas o perfiles: ${getErrorMessage(err)}`);
             console.error(err);
         } finally {
             setLoading(false);
@@ -126,8 +141,8 @@ const TasksBoard: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        fetchTasks();
-    }, [fetchTasks]);
+        fetchTasksAndProfiles();
+    }, [fetchTasksAndProfiles]);
 
     const handleOpenModal = (task: Task | null) => {
         setSelectedTask(task);
@@ -141,7 +156,7 @@ const TasksBoard: React.FC = () => {
 
     const handleSave = () => {
         handleCloseModal();
-        fetchTasks();
+        fetchTasksAndProfiles();
     };
 
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>, taskId: number) => {
@@ -210,6 +225,7 @@ const TasksBoard: React.FC = () => {
                         onDrop={handleDrop}
                         onDragStart={handleDragStart}
                         draggedTaskId={draggedTaskId}
+                        agentMap={agentMap}
                     />
                 ))}
             </div>

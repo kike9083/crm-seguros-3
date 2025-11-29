@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { createLead, updateLead, promoteLeadToClient, deleteLead, getErrorMessage } from '../services/api';
-import { Lead, LeadStatus } from '../types';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createLead, updateLead, promoteLeadToClient, deleteLead, getErrorMessage, getAllProfiles, getFiles, uploadFile, getPublicUrl, sanitizeFileName } from '../services/api';
+import { Lead, LeadStatus, Profile, FileObject } from '../types';
 import { LEAD_STATUSES } from '../constants';
 import { useAuth } from './auth/AuthContext';
 import ConfirmationModal from './ConfirmationModal';
+import Spinner from './Spinner';
+import PlusIcon from './icons/PlusIcon';
 
 interface LeadModalProps {
     lead: Lead | null;
@@ -13,6 +15,9 @@ interface LeadModalProps {
 
 const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
     const { user, profile } = useAuth();
+    const isAdmin = profile?.rol === 'ADMIN';
+    const [agents, setAgents] = useState<Profile[]>([]);
+
     const [formData, setFormData] = useState({
         nombre: '',
         email: '',
@@ -20,13 +25,53 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
         fuente: 'Web',
         estatus_lead: 'NUEVO' as LeadStatus,
         notas: '',
-        agent_id: user?.id
+        agent_id: user?.id || '',
+        // New fields
+        fecha_nacimiento: '',
+        ocupacion: '',
+        ingresos_mensuales: 0 as string | number,
+        polizas_externas: ''
     });
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
+    // Archivos
+    const [files, setFiles] = useState<FileObject[]>([]);
+    const [isFilesLoading, setIsFilesLoading] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
+    const [fileError, setFileError] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const fetchFiles = useCallback(async () => {
+        if (!lead) return;
+        setIsFilesLoading(true);
+        setFileError(null);
+        try {
+            // Requiere bucket 'lead_files' en Supabase
+            const fileList = await getFiles('lead_files', String(lead.id));
+            setFiles(fileList);
+        } catch (err) {
+            console.error('Error fetching files:', err);
+            // No mostramos error crítico si falla, solo en consola, para no bloquear el modal
+            // setFileError(`No se pudieron cargar los archivos.`); 
+        } finally {
+            setIsFilesLoading(false);
+        }
+    }, [lead]);
+
     useEffect(() => {
+        const fetchAgents = async () => {
+            try {
+                const allProfiles = await getAllProfiles();
+                const filteredAgents = allProfiles.filter(p => p.rol === 'AGENTE');
+                setAgents(filteredAgents);
+            } catch (err) {
+                console.error("Error fetching agents:", err);
+            }
+        };
+        fetchAgents();
+
         if (lead) {
             setFormData({
                 nombre: lead.nombre,
@@ -35,14 +80,49 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
                 fuente: lead.fuente,
                 estatus_lead: lead.estatus_lead,
                 notas: lead.notas || '',
-                agent_id: lead.agent_id || user?.id
+                agent_id: lead.agent_id || (isAdmin ? '' : (user?.id || '')),
+                // Mapear nuevos campos
+                fecha_nacimiento: lead.fecha_nacimiento ? lead.fecha_nacimiento.split('T')[0] : '',
+                ocupacion: lead.ocupacion || '',
+                ingresos_mensuales: lead.ingresos_mensuales || 0,
+                polizas_externas: lead.polizas_externas || ''
             });
+            fetchFiles();
+        } else {
+            setFormData(prev => ({ ...prev, agent_id: user?.id || '' }));
+            setFiles([]);
         }
-    }, [lead, user]);
+    }, [lead, user, isAdmin, fetchFiles]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file || !lead) return;
+
+        setIsUploading(true);
+        setFileError(null);
+        try {
+            const sanitizedName = sanitizeFileName(file.name);
+            const filePath = `${lead.id}/${sanitizedName}`;
+            await uploadFile('lead_files', filePath, file);
+            await fetchFiles();
+        } catch (err) {
+            console.error('Error uploading file:', err);
+            setFileError(`Error al subir el archivo: ${getErrorMessage(err)}`);
+        } finally {
+            setIsUploading(false);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = "";
+            }
+        }
+    };
+
+    const handleButtonClick = () => {
+        fileInputRef.current?.click();
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -50,23 +130,27 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
         setIsSaving(true);
         setError(null);
 
+        // Convert number explicitly
+        const dataToSubmit = {
+            ...formData,
+            ingresos_mensuales: Number(formData.ingresos_mensuales)
+        };
+
         try {
             if (lead) {
-                const updatedLead = await updateLead(lead.id, formData);
+                const updatedLead = await updateLead(lead.id, dataToSubmit);
                 if (updatedLead.estatus_lead === 'GANADO') {
                     await promoteLeadToClient(lead.id);
                 }
             } else {
-                const newLead = await createLead(formData);
+                const newLead = await createLead(dataToSubmit);
                  if (newLead.estatus_lead === 'GANADO' && newLead.id) {
                     await promoteLeadToClient(newLead.id);
                 }
             }
             onSave();
         } catch (err) {
-            const message = `Error al guardar el lead: ${getErrorMessage(err)}`;
-            setError(message);
-            alert(message);
+            setError(`Error al guardar el lead: ${getErrorMessage(err)}`);
             console.error(err);
         } finally {
             setIsSaving(false);
@@ -77,7 +161,7 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
         if (!lead) return;
         try {
             await deleteLead(lead.id);
-            onSave(); // Close modal and refresh list
+            onSave();
         } catch (err) {
             setError(`Error al eliminar el lead: ${getErrorMessage(err)}`);
         } finally {
@@ -88,14 +172,14 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
     return (
         <>
             <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
-                <div className="bg-card rounded-lg shadow-2xl p-8 w-full max-w-lg">
+                <div className="bg-card rounded-lg shadow-2xl p-8 w-full max-w-lg max-h-[90vh] overflow-y-auto">
                     <h2 className="text-2xl font-bold mb-6">{lead ? 'Editar Lead' : 'Nuevo Lead'}</h2>
                     <form onSubmit={handleSubmit} className="space-y-4">
+                        <div>
+                            <label htmlFor="nombre" className="block text-sm font-medium text-text-secondary mb-1">Nombre Completo</label>
+                            <input id="nombre" name="nombre" value={formData.nombre} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required />
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label htmlFor="nombre" className="block text-sm font-medium text-text-secondary mb-1">Nombre Completo</label>
-                                <input id="nombre" name="nombre" value={formData.nombre} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required />
-                            </div>
                             <div>
                                 <label htmlFor="email" className="block text-sm font-medium text-text-secondary mb-1">Email</label>
                                 <input id="email" name="email" value={formData.email} onChange={handleChange} type="email" className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required />
@@ -103,6 +187,10 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
                             <div>
                                 <label htmlFor="telefono" className="block text-sm font-medium text-text-secondary mb-1">Teléfono</label>
                                 <input id="telefono" name="telefono" value={formData.telefono} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
+                            </div>
+                            <div>
+                                <label htmlFor="fecha_nacimiento" className="block text-sm font-medium text-text-secondary mb-1">Fecha de Nacimiento</label>
+                                <input id="fecha_nacimiento" name="fecha_nacimiento" type="date" value={formData.fecha_nacimiento} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
                             </div>
                             <div>
                                 <label htmlFor="fuente" className="block text-sm font-medium text-text-secondary mb-1">Fuente</label>
@@ -114,20 +202,115 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
                                 </select>
                             </div>
                         </div>
+
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label htmlFor="ocupacion" className="block text-sm font-medium text-text-secondary mb-1">Ocupación</label>
+                                <input id="ocupacion" name="ocupacion" value={formData.ocupacion} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Ej. Arquitecto" />
+                            </div>
+                            <div>
+                                <label htmlFor="ingresos_mensuales" className="block text-sm font-medium text-text-secondary mb-1">Ingresos ($)</label>
+                                <input id="ingresos_mensuales" name="ingresos_mensuales" type="number" value={formData.ingresos_mensuales} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label htmlFor="polizas_externas" className="block text-sm font-medium text-text-secondary mb-1">Pólizas Externas</label>
+                            <textarea id="polizas_externas" name="polizas_externas" value={formData.polizas_externas} onChange={handleChange} rows={2} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" placeholder="Ej. Vida con MetLife..." />
+                        </div>
+
                         <div>
                             <label htmlFor="estatus_lead" className="block text-sm font-medium text-text-secondary mb-1">Estatus</label>
                             <select id="estatus_lead" name="estatus_lead" value={formData.estatus_lead} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary">
                                 {LEAD_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
                             </select>
                         </div>
+                        {isAdmin && (
+                            <div>
+                                <label htmlFor="agent_id" className="block text-sm font-medium text-text-secondary mb-1">Agente Responsable</label>
+                                <select 
+                                    id="agent_id" 
+                                    name="agent_id" 
+                                    value={formData.agent_id} 
+                                    onChange={handleChange} 
+                                    className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary"
+                                >
+                                    <option value="">(Sin asignar)</option>
+                                    {agents.map(agent => (
+                                        <option key={agent.id} value={agent.id}>{agent.nombre}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
                         <div>
-                        <label htmlFor="notas" className="block text-sm font-medium text-text-secondary mb-1">Notas</label>
-                        <textarea id="notas" name="notas" value={formData.notas} onChange={handleChange} rows={3} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary"></textarea>
+                            <label htmlFor="notas" className="block text-sm font-medium text-text-secondary mb-1">Notas</label>
+                            <textarea id="notas" name="notas" value={formData.notas} onChange={handleChange} rows={3} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary"></textarea>
                         </div>
+
+                        {/* Sección de Archivos */}
+                        {lead && (
+                            <div className="mt-4 border-t border-border pt-4">
+                                <h3 className="text-lg font-medium text-text-primary mb-3 flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2"><path strokeLinecap="round" strokeLinejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.122 2.122l7.81-7.81" /></svg>
+                                    Archivos del Lead
+                                </h3>
+                                {isFilesLoading ? (
+                                    <div className="flex justify-center p-4"><Spinner /></div>
+                                ) : fileError ? (
+                                    <p className="text-red-500 text-sm">{fileError}</p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {files.length === 0 && !isUploading && (
+                                            <p className="text-text-secondary text-sm">No hay archivos adjuntos.</p>
+                                        )}
+                                        {files.map(file => (
+                                            <div key={file.id} className="flex items-center justify-between bg-secondary p-2 rounded">
+                                                <span className="text-sm truncate">{file.name}</span>
+                                                <a
+                                                    href={getPublicUrl('lead_files', `${lead.id}/${file.name}`)}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    download
+                                                    className="text-accent hover:underline p-1"
+                                                    title="Descargar"
+                                                >
+                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
+                                                </a>
+                                            </div>
+                                        ))}
+                                        {isUploading && (
+                                            <div className="flex items-center text-sm text-text-secondary">
+                                                <Spinner />
+                                                <span className="ml-2">Subiendo archivo...</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                                <div className="mt-4">
+                                    <input
+                                        type="file"
+                                        ref={fileInputRef}
+                                        onChange={handleFileChange}
+                                        className="hidden"
+                                        disabled={isUploading}
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleButtonClick}
+                                        disabled={isUploading}
+                                        className="flex items-center text-sm bg-secondary hover:bg-gray-600 text-white font-bold py-2 px-3 rounded-lg transition-colors disabled:opacity-50"
+                                    >
+                                        <PlusIcon className="w-4 h-4 mr-2" />
+                                        Añadir Archivo
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                         {error && <p className="text-red-500 mt-4 text-sm">{error}</p>}
                         <div className="mt-6 flex justify-between items-center">
                             <div>
-                                {lead && profile?.rol === 'ADMIN' && (
+                                {lead && isAdmin && (
                                     <button
                                         type="button"
                                         onClick={() => setIsConfirmModalOpen(true)}

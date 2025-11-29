@@ -1,51 +1,72 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import UserManagement from './UserManagement';
-import TeamManagement from './TeamManagement';
+import GeneralSettings from './GeneralSettings';
 import { useAuth } from '../auth/AuthContext';
 
-type SettingsTab = 'users' | 'teams';
+type SettingsTab = 'team' | 'general';
 
 const Settings: React.FC = () => {
     const { profile } = useAuth();
-    const [activeTab, setActiveTab] = useState<SettingsTab>('users');
+    const isAdmin = profile?.rol === 'ADMIN';
 
-    if (profile?.rol !== 'ADMIN') {
-        return <p className="text-red-500">No tienes permiso para ver esta sección.</p>;
-    }
+    // Si no es admin, la pestaña por defecto es 'general', de lo contrario es 'team'.
+    const [activeTab, setActiveTab] = useState<SettingsTab>(isAdmin ? 'team' : 'general');
 
-    const tabs: { id: SettingsTab; label: string }[] = [
-        { id: 'users', label: 'Gestión de Usuarios' },
-        { id: 'teams', label: 'Gestión de Equipos' },
-    ];
+    useEffect(() => {
+        // Asegura que si un agente llega a la configuración, siempre vea la pestaña 'general'
+        if (!isAdmin && activeTab === 'team') {
+            setActiveTab('general');
+        }
+    }, [isAdmin, activeTab]);
 
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-2xl font-bold">Configuración</h1>
-                <p className="text-text-secondary">Gestiona los usuarios y equipos de la plataforma.</p>
+                <h1 className="text-2xl font-bold text-text-primary">Configuración</h1>
+                <p className="text-text-secondary">Administra tu equipo y las preferencias de la plataforma.</p>
             </div>
             
-            <div className="border-b border-border">
-                <nav className="-mb-px flex space-x-6" aria-label="Tabs">
-                    {tabs.map(tab => (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
-                            className={`${
-                                activeTab === tab.id
-                                    ? 'border-primary text-primary'
-                                    : 'border-transparent text-text-secondary hover:text-text-primary hover:border-gray-500'
-                            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors focus:outline-none`}
-                        >
-                            {tab.label}
-                        </button>
-                    ))}
-                </nav>
+            <div className="flex border-b border-border">
+                {isAdmin && (
+                    <button
+                        className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 ${
+                            activeTab === 'team'
+                                ? 'border-primary text-primary'
+                                : 'border-transparent text-text-secondary hover:text-text-primary'
+                        }`}
+                        onClick={() => setActiveTab('team')}
+                    >
+                        Equipo
+                    </button>
+                )}
+                <button
+                    className={`px-6 py-3 font-medium text-sm transition-colors border-b-2 ${
+                        activeTab === 'general'
+                            ? 'border-primary text-primary'
+                            : 'border-transparent text-text-secondary hover:text-text-primary'
+                    }`}
+                    onClick={() => setActiveTab('general')}
+                >
+                    General
+                </button>
             </div>
 
-            <div>
-                {activeTab === 'users' && <UserManagement />}
-                {activeTab === 'teams' && <TeamManagement />}
+            <div className="mt-6">
+                {activeTab === 'team' && isAdmin && (
+                    <div className="animate-fade-in">
+                        <div className="mb-6">
+                            <h2 className="text-xl font-semibold text-text-primary">Gestión de Equipos</h2>
+                            <p className="text-sm text-text-secondary">
+                                Controla quién tiene acceso a la plataforma, gestiona roles y administra a tus agentes.
+                            </p>
+                        </div>
+                        <UserManagement />
+                    </div>
+                )}
+                {activeTab === 'general' && (
+                    <GeneralSettings />
+                )}
             </div>
         </div>
     );

@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
-import { createTask, updateTask, getLeads, getClients, deleteTask, getErrorMessage } from '../services/api';
-import { Task, TaskStatus, Lead, Client } from '../types';
+import { createTask, updateTask, getLeads, getClients, deleteTask, getErrorMessage, getAllProfiles } from '../services/api';
+import { Task, TaskStatus, Lead, Client, Profile } from '../types';
 import { TASK_STATUSES } from '../constants';
 import { useAuth } from './auth/AuthContext';
 import ConfirmationModal from './ConfirmationModal';
@@ -13,6 +14,9 @@ interface TaskModalProps {
 
 const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onSave }) => {
     const { user, profile } = useAuth();
+    const isAdmin = profile?.rol === 'ADMIN';
+    const [agents, setAgents] = useState<Profile[]>([]);
+
     const [formData, setFormData] = useState({
         descripcion: '',
         tipo: 'LLAMADA' as 'LLAMADA' | 'EMAIL' | 'CITA' | 'WHATSAPP',
@@ -21,7 +25,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onSave }) => {
         estatus: 'PENDIENTE' as TaskStatus,
         lead_id: undefined as number | undefined,
         client_id: undefined as number | undefined,
-        agent_id: user?.id
+        agent_id: user?.id || ''
     });
     const [leads, setLeads] = useState<Lead[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
@@ -32,13 +36,14 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onSave }) => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [leadsData, clientsData] = await Promise.all([getLeads(), getClients()]);
+                const [leadsData, clientsData, allProfiles] = await Promise.all([getLeads(), getClients(), getAllProfiles()]);
                 
                 const convertedLeadIds = new Set(clientsData.map(c => c.lead_origen_id).filter(id => id != null));
                 const filteredLeads = leadsData.filter(lead => !convertedLeadIds.has(lead.id));
 
                 setLeads(filteredLeads);
                 setClients(clientsData);
+                setAgents(allProfiles.filter(p => p.rol === 'AGENTE'));
             } catch (err) {
                 console.error("Failed to fetch leads and clients", err);
                 setError(`No se pudieron cargar los contactos: ${getErrorMessage(err)}`);
@@ -55,10 +60,13 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onSave }) => {
                 estatus: task.estatus,
                 lead_id: task.lead_id,
                 client_id: task.client_id,
-                agent_id: task.agent_id || user?.id
+                agent_id: task.agent_id || (isAdmin ? '' : (user?.id || ''))
             });
+        } else {
+             // For new tasks, set agent_id to current user's ID
+            setFormData(prev => ({ ...prev, agent_id: user?.id || '' }));
         }
-    }, [task, user]);
+    }, [task, user, isAdmin]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -67,12 +75,30 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onSave }) => {
 
     const handleContactChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const { value } = e.target;
+        let selectedLeadId: number | undefined;
+        let selectedClientId: number | undefined;
+        let defaultAgentId = user?.id || '';
+
         if(value.startsWith('lead-')) {
-            setFormData(prev => ({ ...prev, lead_id: parseInt(value.replace('lead-', '')), client_id: undefined }));
+            selectedLeadId = parseInt(value.replace('lead-', ''));
+            const selectedLead = leads.find(l => l.id === selectedLeadId);
+            if (!isAdmin) { // For agents, default to their ID
+                defaultAgentId = user?.id || '';
+            } else { // Admins can choose or default to lead's agent
+                defaultAgentId = selectedLead?.agent_id || '';
+            }
+            setFormData(prev => ({ ...prev, lead_id: selectedLeadId, client_id: undefined, agent_id: defaultAgentId }));
         } else if (value.startsWith('client-')) {
-            setFormData(prev => ({ ...prev, client_id: parseInt(value.replace('client-', '')), lead_id: undefined }));
+            selectedClientId = parseInt(value.replace('client-', ''));
+            const selectedClient = clients.find(c => c.id === selectedClientId);
+            if (!isAdmin) { // For agents, default to their ID
+                defaultAgentId = user?.id || '';
+            } else { // Admins can choose or default to client's agent
+                defaultAgentId = selectedClient?.agent_id || '';
+            }
+            setFormData(prev => ({ ...prev, client_id: selectedClientId, lead_id: undefined, agent_id: defaultAgentId }));
         } else {
-             setFormData(prev => ({ ...prev, client_id: undefined, lead_id: undefined }));
+             setFormData(prev => ({ ...prev, client_id: undefined, lead_id: undefined, agent_id: user?.id || '' }));
         }
     }
 
@@ -87,6 +113,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onSave }) => {
         setError(null);
         
         try {
+            // api.ts handles empty string conversion to null for UUID fields
             if (task) {
                 await updateTask(task.id, formData);
             } else {
@@ -94,9 +121,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onSave }) => {
             }
             onSave();
         } catch (err) {
-            const message = `Error al guardar la tarea: ${getErrorMessage(err)}`;
-            setError(message);
-            alert(message);
+            setError(`Error al guardar la tarea: ${getErrorMessage(err)}`);
             console.error(err);
         } finally {
             setIsSaving(false);
@@ -174,10 +199,28 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, onClose, onSave }) => {
                             </div>
                         </div>
 
+                        {isAdmin && (
+                            <div>
+                                <label htmlFor="agent_id" className="block text-sm font-medium text-text-secondary mb-1">Agente Responsable</label>
+                                <select 
+                                    id="agent_id" 
+                                    name="agent_id" 
+                                    value={formData.agent_id} 
+                                    onChange={handleChange} 
+                                    className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary"
+                                >
+                                    <option value="">(Sin asignar)</option>
+                                    {agents.map(agent => (
+                                        <option key={agent.id} value={agent.id}>{agent.nombre}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
                         {error && <p className="text-red-500 mt-4 text-sm">{error}</p>}
                         <div className="mt-6 flex justify-between items-center">
                             <div>
-                                {task && profile?.rol === 'ADMIN' && (
+                                {task && isAdmin && (
                                     <button
                                         type="button"
                                         onClick={() => setIsConfirmModalOpen(true)}

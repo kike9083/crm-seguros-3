@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getLeads, updateLead, promoteLeadToClient, getErrorMessage } from '../services/api';
-import { Lead, LeadStatus } from '../types';
+import { getLeads, updateLead, promoteLeadToClient, getErrorMessage, getAllProfiles } from '../services/api';
+import { Lead, LeadStatus, Profile } from '../types';
 import { LEAD_STATUSES, STATUS_COLORS } from '../constants';
 import Spinner from './Spinner';
 import LeadModal from './LeadModal';
@@ -11,7 +11,8 @@ const LeadCard: React.FC<{
     onClick: () => void;
     onDragStart: (e: React.DragEvent<HTMLDivElement>, leadId: number) => void;
     isDragging: boolean;
-}> = ({ lead, onClick, onDragStart, isDragging }) => (
+    agentName: string | null;
+}> = ({ lead, onClick, onDragStart, isDragging, agentName }) => (
     <div
         draggable
         onDragStart={(e) => onDragStart(e, lead.id)}
@@ -23,6 +24,7 @@ const LeadCard: React.FC<{
         <p className="text-sm text-text-secondary">{lead.email}</p>
         <p className="text-sm text-text-secondary mt-1">{lead.telefono}</p>
         <div className="mt-2 text-xs text-text-secondary">Fuente: {lead.fuente}</div>
+        {agentName && <div className="mt-2 text-xs text-blue-300">Agente: {agentName}</div>}
     </div>
 );
 
@@ -33,7 +35,8 @@ const PipelineColumn: React.FC<{
     onDrop: (e: React.DragEvent<HTMLDivElement>, status: LeadStatus) => void;
     onDragStart: (e: React.DragEvent<HTMLDivElement>, leadId: number) => void;
     draggedLeadId: number | null;
-}> = ({ status, leads, onCardClick, onDrop, onDragStart, draggedLeadId }) => {
+    agentMap: Map<string, string>;
+}> = ({ status, leads, onCardClick, onDrop, onDragStart, draggedLeadId, agentMap }) => {
     const [isDraggedOver, setIsDraggedOver] = useState(false);
     const statusColor = STATUS_COLORS[status] || 'bg-gray-500';
 
@@ -77,6 +80,7 @@ const PipelineColumn: React.FC<{
                         onClick={() => onCardClick(lead)}
                         onDragStart={onDragStart}
                         isDragging={draggedLeadId === lead.id}
+                        agentName={lead.agent_id ? agentMap.get(lead.agent_id) : null}
                     />
                 ))}
             </div>
@@ -86,21 +90,31 @@ const PipelineColumn: React.FC<{
 
 const PipelineBoard: React.FC = () => {
     const [leads, setLeads] = useState<Lead[]>([]);
+    const [profiles, setProfiles] = useState<Profile[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [draggedLeadId, setDraggedLeadId] = useState<number | null>(null);
 
+    const agentMap = React.useMemo(() => {
+        const map = new Map<string, string>();
+        profiles.forEach(p => map.set(p.id, p.nombre));
+        return map;
+    }, [profiles]);
 
-    const fetchLeads = useCallback(async () => {
+    const fetchLeadsAndProfiles = useCallback(async () => {
         try {
             setLoading(true);
             setError(null);
-            const data = await getLeads();
-            setLeads(data);
+            const [leadsData, profilesData] = await Promise.all([
+                getLeads(),
+                getAllProfiles()
+            ]);
+            setLeads(leadsData);
+            setProfiles(profilesData);
         } catch (err) {
-            setError(`No se pudieron cargar los leads: ${getErrorMessage(err)}`);
+            setError(`No se pudieron cargar los leads o perfiles: ${getErrorMessage(err)}`);
             console.error(err);
         } finally {
             setLoading(false);
@@ -108,8 +122,8 @@ const PipelineBoard: React.FC = () => {
     }, []);
     
     useEffect(() => {
-        fetchLeads();
-    }, [fetchLeads]);
+        fetchLeadsAndProfiles();
+    }, [fetchLeadsAndProfiles]);
 
     const handleOpenModal = (lead: Lead | null) => {
         setSelectedLead(lead);
@@ -123,7 +137,7 @@ const PipelineBoard: React.FC = () => {
 
     const handleSave = () => {
         handleCloseModal();
-        fetchLeads(); // Refresh data after save
+        fetchLeadsAndProfiles(); // Refresh data after save
     };
     
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>, leadId: number) => {
@@ -193,6 +207,7 @@ const PipelineBoard: React.FC = () => {
                         onDrop={handleDrop}
                         onDragStart={handleDragStart}
                         draggedLeadId={draggedLeadId}
+                        agentMap={agentMap}
                     />
                 ))}
             </div>

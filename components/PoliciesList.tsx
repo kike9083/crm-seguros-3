@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { getPolicies, deletePolicy, getErrorMessage } from '../services/api';
-import { Policy } from '../types';
+import { getPolicies, deletePolicy, getErrorMessage, getAllProfiles } from '../services/api';
+import { Policy, Profile } from '../types';
 import Spinner from './Spinner';
 import PlusIcon from './icons/PlusIcon';
 import PolicyModal from './PolicyModal';
@@ -10,33 +10,32 @@ import { useAuth } from './auth/AuthContext';
 const PoliciesList: React.FC = () => {
     const { profile } = useAuth();
     const [policies, setPolicies] = useState<Policy[]>([]);
+    const [profiles, setProfiles] = useState<Profile[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [policyToDelete, setPolicyToDelete] = useState<Policy | null>(null);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
 
-     useEffect(() => {
-        const timerId = setTimeout(() => {
-            setDebouncedSearchTerm(searchTerm);
-        }, 500);
+    const agentMap = React.useMemo(() => {
+        const map = new Map<string, string>();
+        profiles.forEach(p => map.set(p.id, p.nombre));
+        return map;
+    }, [profiles]);
 
-        return () => {
-            clearTimeout(timerId);
-        };
-    }, [searchTerm]);
-
-    const fetchPolicies = useCallback(async (search: string) => {
+    const fetchPoliciesAndProfiles = useCallback(async () => {
         try {
             setLoading(true);
             setError(null);
-            const data = await getPolicies(search);
-            setPolicies(data);
+            const [policiesData, profilesData] = await Promise.all([
+                getPolicies(),
+                getAllProfiles()
+            ]);
+            setPolicies(policiesData);
+            setProfiles(profilesData);
         } catch (err) {
-            setError(`No se pudieron cargar las pólizas: ${getErrorMessage(err)}`);
+            setError(`No se pudieron cargar las pólizas o perfiles: ${getErrorMessage(err)}`);
             console.error(err);
         } finally {
             setLoading(false);
@@ -44,8 +43,8 @@ const PoliciesList: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        fetchPolicies(debouncedSearchTerm);
-    }, [fetchPolicies, debouncedSearchTerm]);
+        fetchPoliciesAndProfiles();
+    }, [fetchPoliciesAndProfiles]);
     
     const handleOpenModal = (policy: Policy | null) => {
         setSelectedPolicy(policy);
@@ -59,7 +58,7 @@ const PoliciesList: React.FC = () => {
 
     const handleSave = () => {
         handleCloseModal();
-        fetchPolicies(debouncedSearchTerm);
+        fetchPoliciesAndProfiles();
     };
 
     const handleDeleteRequest = (policy: Policy) => {
@@ -71,7 +70,7 @@ const PoliciesList: React.FC = () => {
         if (!policyToDelete) return;
         try {
             await deletePolicy(policyToDelete.id);
-            fetchPolicies(debouncedSearchTerm);
+            fetchPoliciesAndProfiles();
         } catch (err) {
             alert(`No se pudo eliminar la póliza: ${getErrorMessage(err)}`);
         } finally {
@@ -103,47 +102,30 @@ const PoliciesList: React.FC = () => {
         return relation.nombre;
     };
     
+    if (loading) return <div className="flex justify-center items-center h-full"><Spinner /></div>;
+    if (error) return <p className="text-red-500 text-center">{error}</p>;
+
     return (
         <>
-            <div className="flex justify-between items-center mb-4">
-                 <div className="relative w-full max-w-md">
-                    <input
-                        type="text"
-                        placeholder="Buscar por cliente, producto o agente..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full bg-secondary p-2 pl-10 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary"
-                        aria-label="Buscar pólizas"
-                    />
-                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-text-secondary">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-                        </svg>
-                    </div>
-                </div>
+            <div className="flex justify-end mb-4">
                 <button
                     onClick={() => handleOpenModal(null)}
-                    className="flex items-center bg-primary hover:bg-accent text-white font-bold py-2 px-4 rounded-lg transition-colors flex-shrink-0 ml-4"
+                    className="flex items-center bg-primary hover:bg-accent text-white font-bold py-2 px-4 rounded-lg transition-colors"
                 >
                     <PlusIcon className="w-5 h-5 mr-2"/>
-                    Crear Póliza
+                    Crear Nueva Póliza
                 </button>
             </div>
             <div className="bg-card p-6 rounded-lg shadow-lg">
                 <div className="overflow-x-auto">
-                     {loading ? (
-                        <div className="flex justify-center items-center h-64"><Spinner /></div>
-                    ) : error ? (
-                        <p className="text-red-500 text-center col-span-full">{error}</p>
-                    ) : (
                     <table className="w-full text-left">
                         <thead className="border-b border-border">
                             <tr>
                                 <th className="p-4">Cliente</th>
                                 <th className="p-4">Producto</th>
-                                <th className="p-4">Agente Asignado</th>
                                 <th className="p-4">Prima Total</th>
                                 <th className="p-4">Comisión Agente</th>
+                                <th className="p-4">Agente</th>
                                 <th className="p-4">Fecha Vencimiento</th>
                                 <th className="p-4">Estatus</th>
                                 <th className="p-4">Acciones</th>
@@ -154,9 +136,9 @@ const PoliciesList: React.FC = () => {
                                 <tr key={policy.id} className="border-b border-border hover:bg-secondary">
                                     <td className="p-4 font-medium">{getRelatedName(policy.clients)}</td>
                                     <td className="p-4 text-text-secondary">{getRelatedName(policy.products)}</td>
-                                    <td className="p-4 text-text-secondary">{policy.profiles?.nombre || 'No asignado'}</td>
                                     <td className="p-4 text-text-secondary">${policy.prima_total.toLocaleString()}</td>
                                     <td className="p-4 text-text-secondary">${policy.comision_agente.toLocaleString()}</td>
+                                    <td className="p-4 text-blue-300">{policy.agent_id ? agentMap.get(policy.agent_id) : 'N/A'}</td>
                                     <td className="p-4 text-text-secondary">{new Date(policy.fecha_vencimiento).toLocaleDateString()}</td>
                                     <td className="p-4">
                                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(policy.estatus_poliza)}`}>
@@ -173,14 +155,8 @@ const PoliciesList: React.FC = () => {
                             ))}
                         </tbody>
                     </table>
-                    )}
-                    {!loading && policies.length === 0 && (
-                         <p className="text-center p-8 text-text-secondary">
-                            {debouncedSearchTerm
-                                ? `No se encontraron pólizas para "${debouncedSearchTerm}".`
-                                : 'No se encontraron pólizas.'
-                            }
-                        </p>
+                    {policies.length === 0 && (
+                        <p className="text-center p-8 text-text-secondary">No se encontraron pólizas.</p>
                     )}
                 </div>
             </div>

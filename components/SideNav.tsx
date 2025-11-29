@@ -6,11 +6,11 @@ import ClipboardListIcon from './icons/ClipboardListIcon';
 import DocumentTextIcon from './icons/DocumentTextIcon';
 import CogIcon from './icons/CogIcon';
 import PresentationChartLineIcon from './icons/PresentationChartLineIcon';
+import TagIcon from './icons/TagIcon';
+import InformationCircleIcon from './icons/InformationCircleIcon';
 import { Profile } from '../types';
-import QuestionMarkCircleIcon from './icons/QuestionMarkCircleIcon';
-import BriefcaseIcon from './icons/BriefcaseIcon';
 
-type View = 'dashboard' | 'pipeline' | 'clients' | 'tasks' | 'policies' | 'products' | 'settings' | 'reports' | 'help';
+type View = 'dashboard' | 'pipeline' | 'clients' | 'tasks' | 'policies' | 'products' | 'settings' | 'reports' | 'guide';
 
 interface SideNavProps {
     currentView: View;
@@ -24,10 +24,10 @@ const navItems = [
     { id: 'clients', label: 'Clientes', icon: UserGroupIcon, roles: ['ADMIN', 'AGENTE'] },
     { id: 'tasks', label: 'Tareas', icon: ClipboardListIcon, roles: ['ADMIN', 'AGENTE'] },
     { id: 'policies', label: 'Pólizas', icon: DocumentTextIcon, roles: ['ADMIN', 'AGENTE'] },
-    { id: 'products', label: 'Productos', icon: BriefcaseIcon, roles: ['ADMIN', 'AGENTE'] },
+    { id: 'products', label: 'Productos', icon: TagIcon, roles: ['ADMIN', 'AGENTE'] },
     { id: 'reports', label: 'Reportes', icon: PresentationChartLineIcon, roles: ['ADMIN', 'AGENTE'] },
-    { id: 'settings', label: 'Configuración', icon: CogIcon, roles: ['ADMIN'] },
-    { id: 'help', label: 'Ayuda y Guía', icon: QuestionMarkCircleIcon, roles: ['ADMIN', 'AGENTE'] },
+    { id: 'guide', label: 'Guía', icon: InformationCircleIcon, roles: ['ADMIN', 'AGENTE'] },
+    { id: 'settings', label: 'Configuración', icon: CogIcon, roles: ['ADMIN', 'AGENTE'] },
 ] as const;
 
 
@@ -41,8 +41,10 @@ const SideNav: React.FC<SideNavProps> = ({ currentView, setCurrentView, profile 
                 <h1 className="text-2xl font-bold ml-4 hidden lg:block">SeguroCRM</h1>
             </div>
             <ul className="space-y-2">
-                {/* FIX: Cast item.roles to a broader type to satisfy the 'includes' method signature against profile.rol */}
-                {navItems.filter(item => (item.roles as readonly string[]).includes(profile.rol)).map(item => (
+                {navItems.filter(item => {
+                    // Robust check: ensure item.roles is treated as a string array and check inclusion
+                    return (item.roles as readonly string[]).includes(profile.rol);
+                }).map(item => (
                     <li key={item.id}>
                         <button
                             onClick={() => setCurrentView(item.id)}
