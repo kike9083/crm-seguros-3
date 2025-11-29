@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { Lead, Client, Policy, Task, Product, Profile, UserRole, FileObject, LeadStatus, MonthlyGoal } from '../types';
+import { Lead, Client, Policy, Task, Product, Profile, UserRole, FileObject, LeadStatus, MonthlyGoal, AuditLog } from '../types';
 import { AuthError, Session, User } from '@supabase/supabase-js';
 
 // Re-export supabase client for direct use in other modules if needed
@@ -23,6 +23,33 @@ export const sanitizeFileName = (name: string): string => {
         .replace(/[\u0300-\u036f]/g, "") // Remove accents
         .replace(/\s+/g, '_') // Replace spaces with underscores
         .replace(/[^a-zA-Z0-9.\-_]/g, ''); // Remove non-url-safe chars
+};
+
+// --- AUDIT LOGGING HELPER ---
+const logActivity = async (action: string, entity: string, entityId?: string, details?: object) => {
+    try {
+        await supabase.rpc('log_activity', {
+            p_action: action,
+            p_entity: entity,
+            p_entity_id: entityId,
+            p_details: details
+        });
+    } catch (e) {
+        console.error("Failed to log activity:", e);
+    }
+};
+
+// --- AUDIT LOGS FETCH ---
+export const getAuditLogs = async () => {
+    // Obtenemos los logs y hacemos join con profiles para saber el nombre del usuario
+    const { data, error } = await supabase
+        .from('audit_logs')
+        .select('*, profiles(nombre, rol)')
+        .order('created_at', { ascending: false })
+        .limit(200);
+        
+    if (error) throw error;
+    return data as unknown as AuditLog[];
 };
 
 
@@ -164,14 +191,16 @@ export const createLead = async (leadData: Omit<Lead, 'id' | 'created_at'>) => {
 };
 
 export const bulkCreateLeads = async (leadsData: any[]) => {
-    // Usamos insert directo ya que la función RPC es para un solo registro y queremos eficiencia.
-    // Asumimos que los datos ya vienen sanitizados del frontend.
     const { data, error } = await supabase
         .from('leads')
         .insert(leadsData)
         .select();
     
     if (error) throw error;
+
+    // Log de auditoría
+    await logActivity('IMPORT', 'LEAD', undefined, { count: leadsData.length });
+
     return data;
 };
 
@@ -197,6 +226,8 @@ export const updateLead = async (id: number, updates: Omit<Lead, 'id' | 'created
 export const deleteLead = async (id: number) => {
     const { error } = await supabase.rpc('delete_lead_secure', { p_id: id });
     if (error) throw error;
+    // Log de auditoría
+    await logActivity('DELETE', 'LEAD', String(id));
 };
 
 export const promoteLeadToClient = async (leadId: number) => {
@@ -231,6 +262,8 @@ export const updateClient = async (id: number, updates: Omit<Client, 'id' | 'cre
 export const deleteClient = async (id: number) => {
     const { error } = await supabase.rpc('delete_client_secure', { p_id: id });
     if (error) throw error;
+    // Log de auditoría
+    await logActivity('DELETE', 'CLIENT', String(id));
 };
 
 // Policies
@@ -272,14 +305,14 @@ export const updatePolicy = async (id: number, updates: Omit<Policy, 'id' | 'cre
 export const deletePolicy = async (id: number) => {
     const { error } = await supabase.rpc('delete_policy_secure', { p_id: id });
     if (error) throw error;
+    // Log de auditoría
+    await logActivity('DELETE', 'POLICY', String(id));
 };
 
 // Storage
 export const uploadFile = async (bucket: string, path: string, file: File) => {
-    // upsert: true permite sobrescribir archivos con el mismo nombre y evita errores de duplicados
     const { data, error } = await supabase.storage.from(bucket).upload(path, file, {
         upsert: true
-        // Removed contentType to let browser handle it
     });
     if (error) throw error;
     return data;
@@ -399,6 +432,8 @@ export const updateTask = async (id: number, updates: Omit<Task, 'id' | 'created
 export const deleteTask = async (id: number) => {
     const { error } = await supabase.rpc('delete_task_secure', { p_id: id });
     if (error) throw error;
+    // Log de auditoría
+    await logActivity('DELETE', 'TASK', String(id));
 };
 
 // Dashboard

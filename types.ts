@@ -108,3 +108,15 @@ export interface MonthlyGoal {
     ap: number; // Accidentes Personales
     salud: number;
 }
+
+export interface AuditLog {
+    id: number;
+    user_id: string;
+    action: string;
+    entity: string;
+    entity_id?: string;
+    details?: any;
+    created_at: string;
+    // La relación con perfiles se resolverá manualmente o via join en la query
+    profiles?: { nombre: string; rol: string } | null; 
+}

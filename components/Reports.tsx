@@ -6,9 +6,10 @@ import {
     getLeads, 
     getClients, 
     getPolicies, 
-    getTasks 
+    getTasks,
+    getAuditLogs 
 } from '../services/api';
-import { Policy, Profile, Lead, Client, Task } from '../types';
+import { Policy, Profile, Lead, Client, Task, AuditLog } from '../types';
 import Spinner from './Spinner';
 import { STATUS_COLORS } from '../constants';
 import { useAuth } from './auth/AuthContext';
@@ -24,6 +25,7 @@ const Reports: React.FC = () => {
     const [clients, setClients] = useState<Client[]>([]);
     const [tasks, setTasks] = useState<Task[]>([]);
     const [profiles, setProfiles] = useState<Profile[]>([]);
+    const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]); 
     
     // UI States
     const [loading, setLoading] = useState(true);
@@ -41,28 +43,33 @@ const Reports: React.FC = () => {
             try {
                 setLoading(true);
                 setError(null);
-                const [
-                    expiringData, 
-                    profilesData,
-                    leadsData,
-                    clientsData,
-                    policiesData,
-                    tasksData
-                ] = await Promise.all([
+                
+                const promises = [
                     getExpiringPolicies(days),
                     getAllProfiles(),
                     getLeads(),
                     getClients(),
                     getPolicies(),
                     getTasks()
-                ]);
+                ];
 
-                setExpiringPolicies(expiringData);
-                setProfiles(profilesData);
-                setLeads(leadsData);
-                setClients(clientsData);
-                setAllPolicies(policiesData as unknown as Policy[]);
-                setTasks(tasksData as unknown as Task[]);
+                // Solo cargar logs si es admin
+                if (isAdmin) {
+                    promises.push(getAuditLogs() as any);
+                }
+
+                const results = await Promise.all(promises);
+
+                setExpiringPolicies(results[0] as Policy[]);
+                setProfiles(results[1] as Profile[]);
+                setLeads(results[2] as Lead[]);
+                setClients(results[3] as Client[]);
+                setAllPolicies(results[4] as unknown as Policy[]);
+                setTasks(results[5] as unknown as Task[]);
+                
+                if (isAdmin && results[6]) {
+                    setAuditLogs(results[6] as AuditLog[]);
+                }
 
             } catch (err) {
                 setError(`Error cargando reportes: ${getErrorMessage(err)}`);
@@ -73,7 +80,7 @@ const Reports: React.FC = () => {
         };
 
         fetchData();
-    }, [days]);
+    }, [days, isAdmin]);
 
     // --- KPI CALCULATIONS ---
     const kpis = useMemo(() => {
@@ -329,9 +336,65 @@ const Reports: React.FC = () => {
                  </div>
             </div>
 
+            {/* AUDIT LOG SECTION - VISIBLE SOLO PARA ADMIN */}
+            {isAdmin && (
+                <div className="bg-card p-6 rounded-lg shadow-lg border border-border">
+                    <h2 className="text-xl font-bold mb-4">Auditoría de Actividad</h2>
+                    <div className="overflow-x-auto max-h-96">
+                        <table className="w-full text-left">
+                            <thead className="border-b border-border bg-secondary bg-opacity-30 sticky top-0">
+                                <tr>
+                                    <th className="p-3 text-sm">Fecha</th>
+                                    <th className="p-3 text-sm">Usuario</th>
+                                    <th className="p-3 text-sm">Acción</th>
+                                    <th className="p-3 text-sm">Entidad</th>
+                                    <th className="p-3 text-sm">Detalles</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {auditLogs.map(log => {
+                                    // Manejo robusto de la relación con profiles.
+                                    // Supabase puede devolver un array o un objeto según la configuración del join.
+                                    let profileName = 'Desconocido';
+                                    if (log.profiles) {
+                                        if (Array.isArray(log.profiles) && log.profiles.length > 0) {
+                                            profileName = log.profiles[0].nombre;
+                                        } else if (!Array.isArray(log.profiles) && (log.profiles as any).nombre) {
+                                            profileName = (log.profiles as any).nombre;
+                                        }
+                                    }
+
+                                    return (
+                                    <tr key={log.id} className="border-b border-border hover:bg-secondary transition-colors">
+                                        <td className="p-3 text-sm text-text-secondary">{new Date(log.created_at).toLocaleString()}</td>
+                                        <td className="p-3 text-sm font-medium">
+                                            {profileName}
+                                        </td>
+                                        <td className="p-3 text-sm">
+                                            <span className={`px-2 py-1 rounded text-xs font-bold ${log.action === 'DELETE' ? 'bg-red-900 text-red-200' : log.action === 'IMPORT' ? 'bg-blue-900 text-blue-200' : 'bg-gray-700'}`}>
+                                                {log.action}
+                                            </span>
+                                        </td>
+                                        <td className="p-3 text-sm text-text-primary">{log.entity}</td>
+                                        <td className="p-3 text-sm text-text-secondary font-mono text-xs">
+                                            {log.details ? JSON.stringify(log.details) : log.entity_id}
+                                        </td>
+                                    </tr>
+                                )})}
+                                {auditLogs.length === 0 && (
+                                    <tr>
+                                        <td colSpan={5} className="text-center p-8 text-text-secondary">No hay registros de auditoría recientes.</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
             {/* EXPORT SECTION */}
             {isAdmin && (
-                <div className="bg-secondary p-6 rounded-lg shadow-lg border border-border">
+                <div className="bg-secondary p-6 rounded-lg shadow-lg border border-border mt-8">
                     <h2 className="text-xl font-bold mb-2">Exportar Datos</h2>
                     <p className="text-text-secondary mb-6 text-sm">Descarga la información completa de tu cartera para análisis externo o copias de seguridad.</p>
                     <div className="flex flex-wrap gap-4">
