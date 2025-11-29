@@ -17,8 +17,11 @@ const ClientsList: React.FC = () => {
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
     
-    // Estado para la búsqueda
+    // Estados para filtros
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedAgentId, setSelectedAgentId] = useState('');
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
 
     const agentMap = React.useMemo(() => {
         const map = new Map<string, string>();
@@ -48,23 +51,36 @@ const ClientsList: React.FC = () => {
         fetchClientsAndProfiles();
     }, [fetchClientsAndProfiles]);
 
-    // Lógica de filtrado con protección contra nulos
+    // Lógica de filtrado avanzada
     const filteredClients = useMemo(() => {
-        if (!searchTerm) return clients;
-        
-        const lowerTerm = searchTerm.toLowerCase();
-        
         return clients.filter(client => {
+            // 1. Filtro de texto
+            const lowerTerm = searchTerm.toLowerCase();
             const agentName = client.agent_id ? agentMap.get(client.agent_id)?.toLowerCase() : '';
-            
-            return (
+            const matchesSearch = !searchTerm || (
                 (client.nombre?.toLowerCase() || '').includes(lowerTerm) ||
                 (client.email?.toLowerCase() || '').includes(lowerTerm) ||
                 (client.telefono?.toLowerCase() || '').includes(lowerTerm) ||
                 (agentName && agentName.includes(lowerTerm))
             );
+
+            // 2. Filtro por Agente
+            const matchesAgent = !selectedAgentId || client.agent_id === selectedAgentId;
+
+            // 3. Filtro por Fecha de Creación (Alta)
+            let matchesDate = true;
+            if (dateFrom || dateTo) {
+                const clientDate = new Date(client.created_at).setHours(0,0,0,0);
+                const from = dateFrom ? new Date(dateFrom).setHours(0,0,0,0) : null;
+                const to = dateTo ? new Date(dateTo).setHours(0,0,0,0) : null;
+
+                if (from && clientDate < from) matchesDate = false;
+                if (to && clientDate > to) matchesDate = false;
+            }
+
+            return matchesSearch && matchesAgent && matchesDate;
         });
-    }, [clients, searchTerm, agentMap]);
+    }, [clients, searchTerm, selectedAgentId, dateFrom, dateTo, agentMap]);
 
     const handleOpenModal = (client: Client) => {
         setSelectedClient(client);
@@ -110,20 +126,64 @@ const ClientsList: React.FC = () => {
 
     return (
         <>
-            <div className="flex justify-between items-center mb-4">
-                <div className="relative w-full max-w-sm">
-                    <input
-                        type="text"
-                        placeholder="Buscar por nombre, email, teléfono o agente..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full bg-secondary p-2 pl-10 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary text-text-primary placeholder-text-secondary"
-                        aria-label="Buscar clientes"
-                    />
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-text-secondary">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
-                        </svg>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                <div className="flex flex-col gap-4 w-full md:w-auto flex-grow">
+                    {/* Barra de búsqueda */}
+                    <div className="relative w-full md:max-w-md">
+                        <input
+                            type="text"
+                            placeholder="Buscar por nombre, email, teléfono..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full bg-secondary p-2 pl-10 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary text-text-primary placeholder-text-secondary"
+                            aria-label="Buscar clientes"
+                        />
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-text-secondary">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                            </svg>
+                        </div>
+                    </div>
+
+                    {/* Filtros */}
+                    <div className="flex flex-wrap gap-2 items-center">
+                        <select
+                            value={selectedAgentId}
+                            onChange={(e) => setSelectedAgentId(e.target.value)}
+                            className="bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                        >
+                            <option value="">Todos los Agentes</option>
+                            {profiles.filter(p => p.rol === 'AGENTE').map(agent => (
+                                <option key={agent.id} value={agent.id}>{agent.nombre}</option>
+                            ))}
+                        </select>
+
+                        <div className="flex items-center gap-2 bg-secondary p-1 rounded border border-border">
+                            <span className="text-xs text-text-secondary ml-2">Desde:</span>
+                            <input 
+                                type="date" 
+                                value={dateFrom} 
+                                onChange={(e) => setDateFrom(e.target.value)}
+                                className="bg-transparent text-sm p-1 focus:outline-none text-text-primary"
+                            />
+                        </div>
+                        <div className="flex items-center gap-2 bg-secondary p-1 rounded border border-border">
+                            <span className="text-xs text-text-secondary ml-2">Hasta:</span>
+                            <input 
+                                type="date" 
+                                value={dateTo} 
+                                onChange={(e) => setDateTo(e.target.value)}
+                                className="bg-transparent text-sm p-1 focus:outline-none text-text-primary"
+                            />
+                        </div>
+                        {(selectedAgentId || dateFrom || dateTo) && (
+                            <button 
+                                onClick={() => { setSelectedAgentId(''); setDateFrom(''); setDateTo(''); }}
+                                className="text-xs text-red-400 hover:text-red-300 underline ml-2"
+                            >
+                                Limpiar filtros
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -161,8 +221,8 @@ const ClientsList: React.FC = () => {
                     </table>
                     {filteredClients.length === 0 && (
                         <p className="text-center p-8 text-text-secondary">
-                            {searchTerm 
-                                ? `No se encontraron resultados para "${searchTerm}".` 
+                            {searchTerm || selectedAgentId || dateFrom || dateTo
+                                ? `No se encontraron clientes con los filtros seleccionados.` 
                                 : 'No se encontraron clientes.'}
                         </p>
                     )}
