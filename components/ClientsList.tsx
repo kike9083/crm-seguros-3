@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getClients, deleteClient, getErrorMessage, getAllProfiles } from '../services/api';
 import { Client, Profile } from '../types';
@@ -212,7 +211,17 @@ const ClientsList: React.FC = () => {
                                 <tr key={client.id} className="border-b border-border hover:bg-secondary">
                                     <td className="p-4 font-medium">{client.nombre}</td>
                                     <td className="p-4 text-text-secondary">{client.email}</td>
-                                    <td className="p-4 text-text-secondary">{client.telefono}</td>
+                                    <td className="p-4 text-text-secondary">
+                                        {client.telefono ? (
+                                            <a 
+                                                href={`tel:${client.telefono}`} 
+                                                className="hover:text-white hover:underline transition-colors"
+                                                title="Llamar"
+                                            >
+                                                {client.telefono}
+                                            </a>
+                                        ) : ''}
+                                    </td>
                                     <td className="p-4">
                                         {rawPhone ? (
                                             <a 

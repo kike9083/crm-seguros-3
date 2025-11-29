@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getLeads, deleteLead, getErrorMessage, getAllProfiles } from '../services/api';
 import { Lead, Profile } from '../types';
@@ -226,7 +225,17 @@ const LeadsList: React.FC = () => {
                                 <tr key={lead.id} className="border-b border-border hover:bg-secondary">
                                     <td className="p-4 font-medium">{lead.nombre}</td>
                                     <td className="p-4 text-text-secondary">{lead.email}</td>
-                                    <td className="p-4 text-text-secondary">{lead.telefono}</td>
+                                    <td className="p-4 text-text-secondary">
+                                        {lead.telefono ? (
+                                            <a 
+                                                href={`tel:${lead.telefono}`} 
+                                                className="hover:text-white hover:underline transition-colors"
+                                                title="Llamar"
+                                            >
+                                                {lead.telefono}
+                                            </a>
+                                        ) : ''}
+                                    </td>
                                     <td className="p-4">
                                         {rawPhone ? (
                                             <a 
