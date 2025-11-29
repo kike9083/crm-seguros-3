@@ -6,7 +6,7 @@ const Guide: React.FC = () => {
       <div>
         <h1 className="text-3xl font-bold text-text-primary mb-2">Guía de Uso del SeguroCRM</h1>
         <p className="text-lg text-text-secondary">
-          Bienvenido a la versión actualizada de tu CRM. Esta guía te ayudará a entender las nuevas funciones operativas, la gestión de documentos y el seguimiento de metas.
+          Bienvenido a la versión actualizada de tu CRM. Esta guía te ayudará a entender las nuevas funciones operativas, la gestión de documentos, el seguimiento de metas y las herramientas avanzadas de búsqueda.
         </p>
       </div>
 
@@ -39,12 +39,27 @@ const Guide: React.FC = () => {
 
         {/* 2. LEADS Y CLIENTES */}
         <article className="space-y-2">
-          <h3 className="text-xl font-medium text-accent">2. Gestión de Leads y Clientes (Datos Extendidos)</h3>
-          <p className="text-text-secondary">Hemos homologado los formularios. Ahora puedes capturar información detallada desde el principio.</p>
+          <h3 className="text-xl font-medium text-accent">2. Gestión de Leads y Clientes</h3>
+          <p className="text-text-secondary">Hemos mejorado la visualización y captura de datos.</p>
+          
+          <div className="bg-secondary p-3 rounded mb-3">
+             <h4 className="font-bold text-white mb-1">Nuevas Vistas y Filtros</h4>
+             <ul className="list-disc list-inside text-text-secondary ml-2 space-y-1">
+                <li><strong>Vista de Lista para Leads:</strong> Además del tablero "Pipeline", ahora tienes una sección <strong>"Lista Leads"</strong> para ver tus prospectos en formato de tabla, ideal para grandes volúmenes de datos.</li>
+                <li><strong>Filtros Avanzados:</strong> Tanto en la lista de Leads como en la de Clientes, ahora puedes filtrar por:
+                    <ul className="list-circle list-inside ml-6 mt-1 text-sm">
+                        <li><strong>Agente Responsable:</strong> (Útil para Administradores) Ve solo los registros asignados a un agente específico.</li>
+                        <li><strong>Rango de Fechas:</strong> Filtra por fecha de creación ("Desde" y "Hasta") para analizar periodos específicos.</li>
+                        <li><strong>Búsqueda Inteligente:</strong> Encuentra rápidamente por nombre, email, teléfono o estatus.</li>
+                    </ul>
+                </li>
+             </ul>
+          </div>
+
           <ul className="list-disc list-inside text-text-secondary ml-4 space-y-1">
-            <li><strong>Nuevos Campos:</strong> Ocupación, Ingresos Mensuales, Fecha de Nacimiento y Pólizas Externas.</li>
+            <li><strong>Datos Extendidos:</strong> Ahora puedes capturar Ocupación, Ingresos Mensuales, Fecha de Nacimiento y Pólizas Externas desde el principio.</li>
             <li><strong>Transición Automática:</strong> Al ganar un Lead, toda esta información se transfiere automáticamente a la ficha del Cliente.</li>
-            <li><strong>Archivos Adjuntos:</strong> Ahora puedes subir documentos (INE, Comprobantes, Cotizaciones) directamente en la ficha del Lead o del Cliente. Los archivos son privados y seguros.</li>
+            <li><strong>Archivos Adjuntos:</strong> Sube documentos (INE, Comprobantes, Cotizaciones) directamente en la ficha del Lead o del Cliente. Los archivos son privados y seguros.</li>
           </ul>
         </article>
 
