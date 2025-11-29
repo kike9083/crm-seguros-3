@@ -11,8 +11,12 @@ import {
 import { Policy, Profile, Lead, Client, Task } from '../types';
 import Spinner from './Spinner';
 import { STATUS_COLORS } from '../constants';
+import { useAuth } from './auth/AuthContext';
 
 const Reports: React.FC = () => {
+    const { profile } = useAuth();
+    const isAdmin = profile?.rol === 'ADMIN';
+
     // Data States
     const [expiringPolicies, setExpiringPolicies] = useState<Policy[]>([]);
     const [allPolicies, setAllPolicies] = useState<Policy[]>([]);
@@ -176,8 +180,8 @@ const Reports: React.FC = () => {
     const exportPolicies = () => {
         const data = allPolicies.map(p => ({
             ID: p.id,
-            Cliente: getRelatedName(p.clients), // Usamos el nombre en vez del ID
-            Producto: getRelatedName(p.products), // Usamos el nombre en vez del ID
+            Cliente: getRelatedName(p.clients), 
+            Producto: getRelatedName(p.products),
             Prima: p.prima_total,
             Comision: p.comision_agente,
             Estatus: p.estatus_poliza,
@@ -326,39 +330,41 @@ const Reports: React.FC = () => {
             </div>
 
             {/* EXPORT SECTION */}
-            <div className="bg-secondary p-6 rounded-lg shadow-lg border border-border">
-                <h2 className="text-xl font-bold mb-2">Exportar Datos</h2>
-                <p className="text-text-secondary mb-6 text-sm">Descarga la información completa de tu cartera para análisis externo o copias de seguridad.</p>
-                <div className="flex flex-wrap gap-4">
-                    <button 
-                        onClick={exportLeads}
-                        className="flex items-center bg-card hover:bg-gray-700 border border-border text-text-primary font-bold py-2 px-4 rounded transition-colors"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                        </svg>
-                        Exportar Leads (CSV)
-                    </button>
-                    <button 
-                        onClick={exportClients}
-                        className="flex items-center bg-card hover:bg-gray-700 border border-border text-text-primary font-bold py-2 px-4 rounded transition-colors"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                        </svg>
-                        Exportar Clientes (CSV)
-                    </button>
-                    <button 
-                        onClick={exportPolicies}
-                        className="flex items-center bg-card hover:bg-gray-700 border border-border text-text-primary font-bold py-2 px-4 rounded transition-colors"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                        </svg>
-                        Exportar Pólizas (CSV)
-                    </button>
+            {isAdmin && (
+                <div className="bg-secondary p-6 rounded-lg shadow-lg border border-border">
+                    <h2 className="text-xl font-bold mb-2">Exportar Datos</h2>
+                    <p className="text-text-secondary mb-6 text-sm">Descarga la información completa de tu cartera para análisis externo o copias de seguridad.</p>
+                    <div className="flex flex-wrap gap-4">
+                        <button 
+                            onClick={exportLeads}
+                            className="flex items-center bg-card hover:bg-gray-700 border border-border text-text-primary font-bold py-2 px-4 rounded transition-colors"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                            </svg>
+                            Exportar Leads (CSV)
+                        </button>
+                        <button 
+                            onClick={exportClients}
+                            className="flex items-center bg-card hover:bg-gray-700 border border-border text-text-primary font-bold py-2 px-4 rounded transition-colors"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                            </svg>
+                            Exportar Clientes (CSV)
+                        </button>
+                        <button 
+                            onClick={exportPolicies}
+                            className="flex items-center bg-card hover:bg-gray-700 border border-border text-text-primary font-bold py-2 px-4 rounded transition-colors"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                            </svg>
+                            Exportar Pólizas (CSV)
+                        </button>
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 };

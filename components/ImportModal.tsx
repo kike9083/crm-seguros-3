@@ -55,19 +55,16 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose, onSuccess }) => {
                 });
 
                 // --- VALIDACIÓN Y NORMALIZACIÓN DE ESTATUS ---
-                // Si el estatus viene vacío o no está en la lista de permitidos, forzar 'NUEVO'
-                // Esto previene el error "invalid input value for enum"
                 if (!lead.estatus_lead || !LEAD_STATUSES.includes(lead.estatus_lead as any)) {
-                    // Opcional: Podrías mapear 'CERRADO' a 'PERDIDO' o 'GANADO' si quisieras lógica específica
-                    // if (lead.estatus_lead === 'CERRADO') lead.estatus_lead = 'PERDIDO'; else ...
                     lead.estatus_lead = 'NUEVO'; 
                 }
 
                 if (!lead.fuente) lead.fuente = 'Importado';
                 
                 // Add system fields
-                // FIX: Remove user_id as it might not exist in DB schema causing import errors.
-                // We rely on agent_id for assignment.
+                // ASIGNAR PROPIETARIO: Es crucial para las políticas RLS.
+                // Si el agente importa, el user_id debe ser su ID.
+                lead.user_id = user?.id; 
                 lead.agent_id = user?.id;
 
                 return lead;
