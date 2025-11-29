@@ -42,6 +42,20 @@ const Guide: React.FC = () => {
           <h3 className="text-xl font-medium text-accent">2. Gestión de Leads y Clientes</h3>
           <p className="text-text-secondary">Hemos potenciado la comunicación y la organización de tu cartera.</p>
           
+          <div className="bg-secondary p-3 rounded mb-3 border-l-4 border-blue-500">
+             <h4 className="font-bold text-white mb-2 flex items-center">
+                Carga Masiva de Datos 🚀
+             </h4>
+             <p className="text-sm text-text-secondary mb-2">
+                ¿Tienes una lista de prospectos en Excel? Usa el botón <strong>"Importar Leads"</strong> en la sección "Lista Leads".
+             </p>
+             <ul className="list-disc list-inside text-text-secondary ml-2 space-y-1 text-sm">
+                <li>Descarga la plantilla CSV proporcionada en la ventana de importación.</li>
+                <li>Copia y pega tus datos respetando las columnas.</li>
+                <li>Sube el archivo para crear múltiples leads en segundos. Se asignarán automáticamente a tu usuario.</li>
+             </ul>
+          </div>
+
           <div className="bg-secondary p-3 rounded mb-3 border-l-4 border-green-500">
              <h4 className="font-bold text-white mb-2 flex items-center">
                 Comunicación en un Clic 📞 💬
@@ -120,7 +134,7 @@ const Guide: React.FC = () => {
                 </ul>
             </div>
             <div className="bg-secondary p-3 rounded">
-                <h4 className="font-bold text-white mb-1">Exportación de Datos</h4>
+                <h4 className="font-bold text-white mb-1">Exportación de Datos (Solo Admin)</h4>
                 <p className="text-sm text-text-secondary mb-2">Respalda tu información.</p>
                 <ul className="list-disc list-inside text-text-secondary text-sm space-y-1">
                     <li><strong>Descarga CSV:</strong> Botones dedicados para exportar toda tu base de datos de Leads, Clientes y Pólizas a formato Excel/CSV.</li>
@@ -154,7 +168,7 @@ const Guide: React.FC = () => {
                     <strong>Inicio de Mes:</strong> Ve al Dashboard, abre "Configurar Meta" y define tus objetivos de venta para Vida, AP y Salud.
                 </li>
                 <li>
-                    <strong>Captura:</strong> Crea un <strong>Lead</strong> nuevo. Rellena los datos financieros e inicia el contacto usando el botón de WhatsApp.
+                    <strong>Captura:</strong> Crea un <strong>Lead</strong> nuevo manualmente o impórtalos masivamente.
                 </li>
                 <li>
                     <strong>Seguimiento:</strong> Crea una <strong>Tarea</strong> tipo "CITA" para reunirte con él. Esto aparecerá en "Reuniones Pendientes".
