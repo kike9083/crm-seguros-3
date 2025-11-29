@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { createLead, updateLead, promoteLeadToClient, deleteLead, getErrorMessage, getAllProfiles, getFiles, uploadFile, getPublicUrl, sanitizeFileName } from '../services/api';
+import { createLead, updateLead, promoteLeadToClient, deleteLead, getErrorMessage, getAllProfiles, getFiles, uploadFile, sanitizeFileName, downloadFile } from '../services/api';
 import { Lead, LeadStatus, Profile, FileObject } from '../types';
 import { LEAD_STATUSES } from '../constants';
 import { useAuth } from './auth/AuthContext';
@@ -266,16 +266,20 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
                                         {files.map(file => (
                                             <div key={file.id} className="flex items-center justify-between bg-secondary p-2 rounded">
                                                 <span className="text-sm truncate">{file.name}</span>
-                                                <a
-                                                    href={getPublicUrl('lead_files', `${lead.id}/${file.name}`)}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    download
-                                                    className="text-accent hover:underline p-1"
+                                                <button
+                                                    onClick={async () => {
+                                                        try {
+                                                            await downloadFile('lead_files', `${lead.id}/${file.name}`, file.name);
+                                                        } catch (err) {
+                                                            alert(`Error al descargar: ${getErrorMessage(err)}`);
+                                                        }
+                                                    }}
+                                                    className="text-accent hover:underline p-1 focus:outline-none"
                                                     title="Descargar"
+                                                    type="button"
                                                 >
                                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
-                                                </a>
+                                                </button>
                                             </div>
                                         ))}
                                         {isUploading && (

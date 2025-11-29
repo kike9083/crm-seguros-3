@@ -266,8 +266,8 @@ export const deletePolicy = async (id: number) => {
 export const uploadFile = async (bucket: string, path: string, file: File) => {
     // upsert: true permite sobrescribir archivos con el mismo nombre y evita errores de duplicados
     const { data, error } = await supabase.storage.from(bucket).upload(path, file, {
-        upsert: true,
-        contentType: file.type || undefined
+        upsert: true
+        // Removed contentType to let browser handle it
     });
     if (error) throw error;
     return data;
@@ -286,6 +286,22 @@ export const getFiles = async (bucket: string, path: string): Promise<FileObject
 export const getPublicUrl = (bucket: string, path: string) => {
     const { data } = supabase.storage.from(bucket).getPublicUrl(path);
     return data.publicUrl;
+};
+
+// Nueva función para descargas autenticadas
+export const downloadFile = async (bucket: string, path: string, fileName: string) => {
+    const { data, error } = await supabase.storage.from(bucket).download(path);
+    if (error) throw error;
+    
+    // Crear un enlace temporal para forzar la descarga del blob
+    const url = window.URL.createObjectURL(data);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
 };
 
 
