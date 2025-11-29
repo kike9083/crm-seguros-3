@@ -1,4 +1,3 @@
-
 import React from 'react';
 import ChartBarIcon from './icons/ChartBarIcon';
 import UserGroupIcon from './icons/UserGroupIcon';
@@ -8,9 +7,10 @@ import CogIcon from './icons/CogIcon';
 import PresentationChartLineIcon from './icons/PresentationChartLineIcon';
 import TagIcon from './icons/TagIcon';
 import InformationCircleIcon from './icons/InformationCircleIcon';
+import ListBulletIcon from './icons/ListBulletIcon';
 import { Profile } from '../types';
 
-type View = 'dashboard' | 'pipeline' | 'clients' | 'tasks' | 'policies' | 'products' | 'settings' | 'reports' | 'guide';
+type View = 'dashboard' | 'pipeline' | 'leads-list' | 'clients' | 'tasks' | 'policies' | 'products' | 'settings' | 'reports' | 'guide';
 
 interface SideNavProps {
     currentView: View;
@@ -21,6 +21,7 @@ interface SideNavProps {
 const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: ChartBarIcon, roles: ['ADMIN', 'AGENTE'] },
     { id: 'pipeline', label: 'Pipeline', icon: ClipboardListIcon, roles: ['ADMIN', 'AGENTE'] },
+    { id: 'leads-list', label: 'Lista Leads', icon: ListBulletIcon, roles: ['ADMIN', 'AGENTE'] },
     { id: 'clients', label: 'Clientes', icon: UserGroupIcon, roles: ['ADMIN', 'AGENTE'] },
     { id: 'tasks', label: 'Tareas', icon: ClipboardListIcon, roles: ['ADMIN', 'AGENTE'] },
     { id: 'policies', label: 'Pólizas', icon: DocumentTextIcon, roles: ['ADMIN', 'AGENTE'] },
@@ -42,7 +43,6 @@ const SideNav: React.FC<SideNavProps> = ({ currentView, setCurrentView, profile 
             </div>
             <ul className="space-y-2">
                 {navItems.filter(item => {
-                    // Robust check: ensure item.roles is treated as a string array and check inclusion
                     return (item.roles as readonly string[]).includes(profile.rol);
                 }).map(item => (
                     <li key={item.id}>

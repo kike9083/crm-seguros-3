@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { AuthProvider } from './components/auth/AuthContext';
 import Auth from './components/auth/Auth';
@@ -14,8 +13,9 @@ import ProductsList from './components/ProductsList';
 import { Profile } from './types';
 import Reports from './components/Reports';
 import Guide from './components/Guide';
+import LeadsList from './components/LeadsList';
 
-type View = 'dashboard' | 'pipeline' | 'clients' | 'tasks' | 'policies' | 'products' | 'settings' | 'reports' | 'guide';
+type View = 'dashboard' | 'pipeline' | 'leads-list' | 'clients' | 'tasks' | 'policies' | 'products' | 'settings' | 'reports' | 'guide';
 
 interface MainAppProps {
     profile: Profile;
@@ -30,6 +30,8 @@ const MainApp: React.FC<MainAppProps> = ({ profile }) => {
                 return <Dashboard />;
             case 'pipeline':
                 return <PipelineBoard />;
+            case 'leads-list':
+                return <LeadsList />;
             case 'clients':
                 return <ClientsList />;
             case 'tasks':

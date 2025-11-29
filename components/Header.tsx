@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { signOut } from '../services/api';
 import { Profile } from '../types';
@@ -11,6 +10,7 @@ interface HeaderProps {
 const viewTitles: { [key: string]: string } = {
     dashboard: 'Dashboard',
     pipeline: 'Pipeline de Ventas',
+    'leads-list': 'Lista de Leads',
     clients: 'Clientes',
     tasks: 'Tareas y Seguimientos',
     policies: 'Pólizas',

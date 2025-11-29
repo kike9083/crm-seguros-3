@@ -48,7 +48,7 @@ const ClientsList: React.FC = () => {
         fetchClientsAndProfiles();
     }, [fetchClientsAndProfiles]);
 
-    // Lógica de filtrado
+    // Lógica de filtrado con protección contra nulos
     const filteredClients = useMemo(() => {
         if (!searchTerm) return clients;
         
@@ -58,9 +58,9 @@ const ClientsList: React.FC = () => {
             const agentName = client.agent_id ? agentMap.get(client.agent_id)?.toLowerCase() : '';
             
             return (
-                client.nombre.toLowerCase().includes(lowerTerm) ||
-                client.email.toLowerCase().includes(lowerTerm) ||
-                (client.telefono && client.telefono.toLowerCase().includes(lowerTerm)) ||
+                (client.nombre?.toLowerCase() || '').includes(lowerTerm) ||
+                (client.email?.toLowerCase() || '').includes(lowerTerm) ||
+                (client.telefono?.toLowerCase() || '').includes(lowerTerm) ||
                 (agentName && agentName.includes(lowerTerm))
             );
         });
@@ -126,7 +126,6 @@ const ClientsList: React.FC = () => {
                         </svg>
                     </div>
                 </div>
-                {/* Espacio reservado si en el futuro se añade botón de crear cliente manual */}
             </div>
 
             <div className="bg-card p-6 rounded-lg shadow-lg">

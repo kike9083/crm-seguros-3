@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getProducts, deleteProduct, getErrorMessage } from '../services/api';
 import { Product } from '../types';
@@ -43,9 +42,10 @@ const ProductsList: React.FC = () => {
         if (!searchTerm) {
             return products;
         }
+        const lowerTerm = searchTerm.toLowerCase();
         return products.filter(product =>
-            product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            product.aseguradora.toLowerCase().includes(searchTerm.toLowerCase())
+            (product.nombre?.toLowerCase() || '').includes(lowerTerm) ||
+            (product.aseguradora?.toLowerCase() || '').includes(lowerTerm)
         );
     }, [products, searchTerm]);
 
