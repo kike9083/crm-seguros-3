@@ -19,6 +19,7 @@ export interface Lead {
     fuente: string;
     estatus_lead: LeadStatus;
     agent_id?: string;
+    user_id?: string; // Nuevo campo añadido en DB
     notas?: string;
     // Nuevos campos homologados con Client
     fecha_nacimiento?: string;
@@ -37,6 +38,7 @@ export interface Client {
     fecha_nacimiento?: string;
     lead_origen_id?: number;
     agent_id?: string;
+    user_id?: string; // Nuevo campo añadido en DB
     // Nuevos campos solicitados
     ocupacion?: string;
     ingresos_mensuales?: number;
@@ -55,6 +57,7 @@ export interface Policy {
     estatus_poliza: PolicyStatus;
     comision_agente: number;
     agent_id?: string;
+    user_id?: string;
     clients: { nombre: string; agent_id?: string } | { nombre: string; agent_id?: string }[] | null; 
     products: { nombre: string; categoria?: string } | { nombre: string; categoria?: string }[] | null;
 }
@@ -84,6 +87,7 @@ export interface Task {
     descripcion: string;
     estatus: TaskStatus;
     agent_id?: string;
+    user_id?: string;
     leads?: { nombre: string; agent_id?: string } | { nombre: string; agent_id?: string }[] | null;
     clients?: { nombre: string; agent_id?: string } | { nombre: string; agent_id?: string }[] | null;
 }

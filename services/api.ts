@@ -163,6 +163,18 @@ export const createLead = async (leadData: Omit<Lead, 'id' | 'created_at'>) => {
     return data as Lead;
 };
 
+export const bulkCreateLeads = async (leadsData: any[]) => {
+    // Usamos insert directo ya que la función RPC es para un solo registro y queremos eficiencia.
+    // Asumimos que los datos ya vienen sanitizados del frontend.
+    const { data, error } = await supabase
+        .from('leads')
+        .insert(leadsData)
+        .select();
+    
+    if (error) throw error;
+    return data;
+};
+
 export const updateLead = async (id: number, updates: Omit<Lead, 'id' | 'created_at'>) => {
     const { data, error } = await supabase.rpc('update_lead_secure', {
         p_id: id,
