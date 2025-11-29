@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getClients, deleteClient, getErrorMessage, getAllProfiles } from '../services/api';
 import { Client, Profile } from '../types';
 import Spinner from './Spinner';
@@ -16,6 +16,9 @@ const ClientsList: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
+    
+    // Estado para la búsqueda
+    const [searchTerm, setSearchTerm] = useState('');
 
     const agentMap = React.useMemo(() => {
         const map = new Map<string, string>();
@@ -44,6 +47,24 @@ const ClientsList: React.FC = () => {
     useEffect(() => {
         fetchClientsAndProfiles();
     }, [fetchClientsAndProfiles]);
+
+    // Lógica de filtrado
+    const filteredClients = useMemo(() => {
+        if (!searchTerm) return clients;
+        
+        const lowerTerm = searchTerm.toLowerCase();
+        
+        return clients.filter(client => {
+            const agentName = client.agent_id ? agentMap.get(client.agent_id)?.toLowerCase() : '';
+            
+            return (
+                client.nombre.toLowerCase().includes(lowerTerm) ||
+                client.email.toLowerCase().includes(lowerTerm) ||
+                (client.telefono && client.telefono.toLowerCase().includes(lowerTerm)) ||
+                (agentName && agentName.includes(lowerTerm))
+            );
+        });
+    }, [clients, searchTerm, agentMap]);
 
     const handleOpenModal = (client: Client) => {
         setSelectedClient(client);
@@ -89,6 +110,25 @@ const ClientsList: React.FC = () => {
 
     return (
         <>
+            <div className="flex justify-between items-center mb-4">
+                <div className="relative w-full max-w-sm">
+                    <input
+                        type="text"
+                        placeholder="Buscar por nombre, email, teléfono o agente..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full bg-secondary p-2 pl-10 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary text-text-primary placeholder-text-secondary"
+                        aria-label="Buscar clientes"
+                    />
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-text-secondary">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                        </svg>
+                    </div>
+                </div>
+                {/* Espacio reservado si en el futuro se añade botón de crear cliente manual */}
+            </div>
+
             <div className="bg-card p-6 rounded-lg shadow-lg">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
@@ -103,7 +143,7 @@ const ClientsList: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {clients.map(client => (
+                            {filteredClients.map(client => (
                                 <tr key={client.id} className="border-b border-border hover:bg-secondary">
                                     <td className="p-4 font-medium">{client.nombre}</td>
                                     <td className="p-4 text-text-secondary">{client.email}</td>
@@ -120,8 +160,12 @@ const ClientsList: React.FC = () => {
                             ))}
                         </tbody>
                     </table>
-                    {clients.length === 0 && (
-                        <p className="text-center p-8 text-text-secondary">No se encontraron clientes. Los leads ganados aparecerán aquí.</p>
+                    {filteredClients.length === 0 && (
+                        <p className="text-center p-8 text-text-secondary">
+                            {searchTerm 
+                                ? `No se encontraron resultados para "${searchTerm}".` 
+                                : 'No se encontraron clientes.'}
+                        </p>
                     )}
                 </div>
             </div>
