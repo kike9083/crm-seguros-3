@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getLeads, deleteLead, getErrorMessage, getAllProfiles } from '../services/api';
 import { Lead, Profile } from '../types';
@@ -5,6 +6,7 @@ import Spinner from './Spinner';
 import LeadModal from './LeadModal';
 import ConfirmationModal from './ConfirmationModal';
 import PlusIcon from './icons/PlusIcon';
+import WhatsAppIcon from './icons/WhatsAppIcon';
 import { useAuth } from './auth/AuthContext';
 import { STATUS_COLORS } from '../constants';
 
@@ -207,6 +209,7 @@ const LeadsList: React.FC = () => {
                                 <th className="p-4">Nombre</th>
                                 <th className="p-4">Email</th>
                                 <th className="p-4">Teléfono</th>
+                                <th className="p-4">WhatsApp</th>
                                 <th className="p-4">Fuente</th>
                                 <th className="p-4">Fecha Creación</th>
                                 <th className="p-4">Estatus</th>
@@ -215,11 +218,30 @@ const LeadsList: React.FC = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredLeads.map(lead => (
+                            {filteredLeads.map(lead => {
+                                // Limpiar número de teléfono para WhatsApp (solo dígitos)
+                                const rawPhone = lead.telefono ? lead.telefono.replace(/\D/g, '') : '';
+                                
+                                return (
                                 <tr key={lead.id} className="border-b border-border hover:bg-secondary">
                                     <td className="p-4 font-medium">{lead.nombre}</td>
                                     <td className="p-4 text-text-secondary">{lead.email}</td>
                                     <td className="p-4 text-text-secondary">{lead.telefono}</td>
+                                    <td className="p-4">
+                                        {rawPhone ? (
+                                            <a 
+                                                href={`https://wa.me/${rawPhone}`} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="text-green-500 hover:text-green-400 inline-block"
+                                                title={`Enviar WhatsApp a ${lead.telefono}`}
+                                            >
+                                                <WhatsAppIcon className="w-6 h-6" />
+                                            </a>
+                                        ) : (
+                                            <span className="text-text-secondary text-xs opacity-50">-</span>
+                                        )}
+                                    </td>
                                     <td className="p-4 text-text-secondary">{lead.fuente}</td>
                                     <td className="p-4 text-text-secondary text-sm">{new Date(lead.created_at).toLocaleDateString()}</td>
                                     <td className="p-4">
@@ -235,7 +257,7 @@ const LeadsList: React.FC = () => {
                                         )}
                                     </td>
                                 </tr>
-                            ))}
+                            )})}
                         </tbody>
                     </table>
                     {filteredLeads.length === 0 && (

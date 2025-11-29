@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getClients, deleteClient, getErrorMessage, getAllProfiles } from '../services/api';
 import { Client, Profile } from '../types';
 import Spinner from './Spinner';
 import ClientModal from './ClientModal';
 import ConfirmationModal from './ConfirmationModal';
+import WhatsAppIcon from './icons/WhatsAppIcon';
 import { useAuth } from './auth/AuthContext';
 
 const ClientsList: React.FC = () => {
@@ -196,17 +198,36 @@ const ClientsList: React.FC = () => {
                                 <th className="p-4">Nombre</th>
                                 <th className="p-4">Email</th>
                                 <th className="p-4">Teléfono</th>
+                                <th className="p-4">WhatsApp</th>
                                 <th className="p-4">Fecha de Alta</th>
                                 <th className="p-4">Agente</th>
                                 <th className="p-4">Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredClients.map(client => (
+                            {filteredClients.map(client => {
+                                const rawPhone = client.telefono ? client.telefono.replace(/\D/g, '') : '';
+                                
+                                return (
                                 <tr key={client.id} className="border-b border-border hover:bg-secondary">
                                     <td className="p-4 font-medium">{client.nombre}</td>
                                     <td className="p-4 text-text-secondary">{client.email}</td>
                                     <td className="p-4 text-text-secondary">{client.telefono}</td>
+                                    <td className="p-4">
+                                        {rawPhone ? (
+                                            <a 
+                                                href={`https://wa.me/${rawPhone}`} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="text-green-500 hover:text-green-400 inline-block"
+                                                title={`Enviar WhatsApp a ${client.telefono}`}
+                                            >
+                                                <WhatsAppIcon className="w-6 h-6" />
+                                            </a>
+                                        ) : (
+                                            <span className="text-text-secondary text-xs opacity-50">-</span>
+                                        )}
+                                    </td>
                                     <td className="p-4 text-text-secondary">{new Date(client.created_at).toLocaleDateString()}</td>
                                     <td className="p-4 text-blue-300">{client.agent_id ? agentMap.get(client.agent_id) : 'N/A'}</td>
                                     <td className="p-4 space-x-2 whitespace-nowrap">
@@ -216,7 +237,7 @@ const ClientsList: React.FC = () => {
                                         )}
                                     </td>
                                 </tr>
-                            ))}
+                            )})}
                         </tbody>
                     </table>
                     {filteredClients.length === 0 && (
