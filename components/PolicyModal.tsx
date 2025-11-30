@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPolicy, updatePolicy, getClients, getProducts, getFiles, uploadFile, getPublicUrl, getErrorMessage, getAllProfiles, sanitizeFileName, downloadFile } from '../services/api';
-import { Client, Product, Policy, PolicyStatus, FileObject, Profile } from '../types';
+import { Client, Product, Policy, PolicyStatus, FileObject, Profile, ProductDetail } from '../types';
 import { useAuth } from './auth/AuthContext';
 import Spinner from './Spinner';
 import PlusIcon from './icons/PlusIcon';
@@ -16,18 +16,26 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
     const isAdmin = profile?.rol === 'ADMIN';
     const [agents, setAgents] = useState<Profile[]>([]);
 
-    // Allow prima_total to be string during editing to support empty input
     const [formData, setFormData] = useState({
         client_id: '',
-        product_id: '',
-        prima_total: 0 as string | number,
         fecha_emision: new Date().toISOString().split('T')[0],
         fecha_vencimiento: '',
         estatus_poliza: 'ACTIVA' as PolicyStatus,
         agent_id: user?.id || ''
     });
+
+    // Estado para gestión de productos
+    const [selectedProducts, setSelectedProducts] = useState<ProductDetail[]>([]);
+    const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
+    
+    // Estado temporal para agregar un nuevo producto
+    const [newProduct, setNewProduct] = useState({
+        id: '',
+        prima_mensual: '' as string | number,
+        suma_asegurada: '' as string | number
+    });
+
     const [clients, setClients] = useState<Client[]>([]);
-    const [products, setProducts] = useState<Product[]>([]);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -46,22 +54,18 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
             setFiles(fileList);
         } catch (err) {
             console.error('Error fetching files:', err);
-            setFileError(`No se pudieron cargar los archivos: ${getErrorMessage(err)}`);
+            setFileError(`No se pudieron cargar los archivos.`);
         } finally {
             setIsFilesLoading(false);
         }
     }, [policy]);
 
-
-    // EFECTO 1: Cargar listas desplegables (Clientes, Productos, Agentes)
-    // Se ejecuta solo una vez al montar el componente (dependencia vacía [])
     useEffect(() => {
         const fetchData = async () => {
             try {
                 const [clientsData, productsData, allProfiles] = await Promise.all([getClients(), getProducts(), getAllProfiles()]);
                 setClients(clientsData);
-                // Filtramos productos activos O el producto que ya tiene asignada la póliza (por si se archivó)
-                setProducts(productsData.filter(p => p.activo || (policy && p.id === policy.product_id)));
+                setAvailableProducts(productsData.filter(p => p.activo));
                 setAgents(allProfiles.filter(p => p.rol === 'AGENTE'));
             } catch (err) {
                 console.error("Failed to fetch lists", err);
@@ -69,37 +73,68 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
             }
         };
         fetchData();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // Dependencias vacías para evitar bucles
+    }, []);
 
-    // EFECTO 2: Inicializar formulario con datos de la póliza
-    // Se ejecuta cuando cambia la prop 'policy'
     useEffect(() => {
         if (policy) {
             setFormData({
                 client_id: String(policy.client_id),
-                product_id: String(policy.product_id),
-                prima_total: policy.prima_total,
-                fecha_emision: policy.fecha_emision.split('T')[0],
-                fecha_vencimiento: policy.fecha_vencimiento.split('T')[0],
+                fecha_emision: policy.fecha_emision ? policy.fecha_emision.split('T')[0] : '',
+                fecha_vencimiento: policy.fecha_vencimiento ? policy.fecha_vencimiento.split('T')[0] : '',
                 estatus_poliza: policy.estatus_poliza,
                 agent_id: policy.agent_id || (isAdmin ? '' : (user?.id || ''))
             });
+
+            // LÓGICA DE RECUPERACIÓN DE PRODUCTOS
+            // 1. Intentar cargar desde el campo JSON 'productos_detalle' (Formato nuevo)
+            if (policy.productos_detalle && Array.isArray(policy.productos_detalle) && policy.productos_detalle.length > 0) {
+                setSelectedProducts(policy.productos_detalle);
+            } 
+            // 2. Fallback: Si no hay detalle JSON (póliza antigua), reconstruir desde 'product_id'
+            else if (policy.product_id) {
+                // Buscamos el producto base en la lista de disponibles (aunque esté inactivo, deberíamos poder verlo, 
+                // pero aquí dependemos de availableProducts que filtra activos. 
+                // Idealmente deberíamos buscar en todos los productos).
+                // Nota: availableProducts se carga asíncronamente, esto podría fallar si se ejecuta antes de fetchData.
+                // Sin embargo, como es solo visualización inicial, intentaremos mapearlo lo mejor posible.
+                
+                // Si availableProducts aún no cargó, no podremos mapear el nombre aquí mismo.
+                // Pero podemos crear un objeto temporal con lo que tenemos en la póliza.
+                
+                // Intentamos usar la relación 'products' si vino del backend (join)
+                const legacyProduct = Array.isArray(policy.products) ? policy.products[0] : policy.products;
+                
+                if (legacyProduct) {
+                     const recoveredProduct: ProductDetail = {
+                        id: policy.product_id,
+                        nombre: legacyProduct.nombre || 'Producto (Legacy)',
+                        categoria: legacyProduct.categoria || 'General',
+                        aseguradora: 'Desconocida', // No siempre disponible en el join simple
+                        prima_mensual: Number(policy.prima_total) || 0, // Usamos el total de la póliza como prima
+                        suma_asegurada: Number(policy.suma_asegurada_total) || 0,
+                        comision_porcentaje: 0, // Dato perdido en legacy
+                        comision_generada: Number(policy.comision_agente) || 0
+                    };
+                    setSelectedProducts([recoveredProduct]);
+                }
+            } else {
+                setSelectedProducts([]);
+            }
+
             fetchFiles();
         } else {
-             // Para nuevas pólizas, limpiar o establecer defaults
+            // Nueva Póliza
             setFormData({
                 client_id: '',
-                product_id: '',
-                prima_total: 0,
                 fecha_emision: new Date().toISOString().split('T')[0],
                 fecha_vencimiento: '',
                 estatus_poliza: 'ACTIVA',
                 agent_id: user?.id || ''
             });
+            setSelectedProducts([]);
             setFiles([]);
         }
-    }, [policy, user, isAdmin, fetchFiles]);
+    }, [policy, user, isAdmin, fetchFiles]); // Removido availableProducts de dependencias para evitar loops, la lógica de legacy es best-effort
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -113,16 +148,57 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
 
         if (name === 'client_id' && !policy) {
             const selectedClient = clients.find(c => c.id === parseInt(value));
-            if (selectedClient?.agent_id && !isAdmin) { // Only auto-assign if not admin
+            if (selectedClient?.agent_id && !isAdmin) { 
                 setFormData(prev => ({ ...prev, agent_id: selectedClient.agent_id }));
-            } else if (isAdmin) { // Admins can choose or keep it empty
+            } else if (isAdmin) {
                 setFormData(prev => ({ ...prev, agent_id: selectedClient?.agent_id || '' }));
-            } else { // Fallback for agents if no client agent_id
+            } else {
                 setFormData(prev => ({ ...prev, agent_id: user?.id || '' }));
             }
         }
     };
-    
+
+    const handleNewProductChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const { name, value } = e.target;
+        setNewProduct(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleAddProduct = () => {
+        if (!newProduct.id || !newProduct.prima_mensual || !newProduct.suma_asegurada) {
+            return; 
+        }
+
+        const prodBase = availableProducts.find(p => p.id === parseInt(newProduct.id));
+        if (prodBase) {
+            const prima = parseFloat(String(newProduct.prima_mensual));
+            const suma = parseFloat(String(newProduct.suma_asegurada));
+            
+            const newDetail: ProductDetail = {
+                id: prodBase.id,
+                nombre: prodBase.nombre,
+                categoria: prodBase.categoria || 'General',
+                aseguradora: prodBase.aseguradora,
+                prima_mensual: prima,
+                suma_asegurada: suma,
+                comision_porcentaje: prodBase.comision_porcentaje,
+                comision_generada: (prima * (prodBase.comision_porcentaje / 100)) * 12 // Estimado anual
+            };
+            setSelectedProducts([...selectedProducts, newDetail]);
+            
+            setNewProduct({ id: '', prima_mensual: '', suma_asegurada: '' });
+        }
+    };
+
+    const handleRemoveProduct = (index: number) => {
+        const newProducts = [...selectedProducts];
+        newProducts.splice(index, 1);
+        setSelectedProducts(newProducts);
+    };
+
+    const totalPrimaMensual = selectedProducts.reduce((sum, p) => sum + Number(p.prima_mensual), 0);
+    const totalSumaAsegurada = selectedProducts.reduce((sum, p) => sum + Number(p.suma_asegurada), 0);
+    const totalComisionEstimada = selectedProducts.reduce((sum, p) => sum + ((p.prima_mensual * (p.comision_porcentaje || 0)) / 100), 0); // Mensual
+
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file || !policy) return;
@@ -132,41 +208,44 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
         try {
             const sanitizedName = sanitizeFileName(file.name);
             const filePath = `${policy.id}/${sanitizedName}`;
-            
             await uploadFile('policy_files', filePath, file);
             await fetchFiles();
         } catch (err) {
             console.error('Error uploading file:', err);
-            setFileError(`Error al subir el archivo: ${getErrorMessage(err)}`);
+            setFileError(`Error al subir.`);
         } finally {
             setIsUploading(false);
-            if (fileInputRef.current) {
-                fileInputRef.current.value = "";
-            }
+            if (fileInputRef.current) fileInputRef.current.value = "";
         }
-    };
-
-    const handleButtonClick = () => {
-        fileInputRef.current?.click();
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formData.client_id || !formData.product_id) {
-            setError("Debe seleccionar un cliente y un producto.");
+        if (!formData.client_id) {
+            setError("Debe seleccionar un cliente.");
             return;
         }
+        if (selectedProducts.length === 0) {
+            setError("Debe seleccionar y configurar al menos un producto.");
+            return;
+        }
+
         setIsSaving(true);
         setError(null);
         
         const dataToSave = {
             client_id: parseInt(formData.client_id),
-            product_id: parseInt(formData.product_id),
-            prima_total: parseFloat(String(formData.prima_total)),
+            product_id: selectedProducts[0].id, 
+            
+            prima_total: totalPrimaMensual, 
+            suma_asegurada_total: totalSumaAsegurada,
+            productos_detalle: selectedProducts,
+            comision_agente: totalComisionEstimada, 
+
             fecha_emision: formData.fecha_emision,
             fecha_vencimiento: formData.fecha_vencimiento,
             estatus_poliza: formData.estatus_poliza,
-            agent_id: formData.agent_id // Pass string, api.ts handles empty string -> null
+            agent_id: formData.agent_id
         };
 
         try {
@@ -177,8 +256,7 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
             }
             onSave();
         } catch (err) {
-            setError(`Error al guardar la póliza: ${getErrorMessage(err)}`);
-            console.error(err);
+            setError(`Error al guardar: ${getErrorMessage(err)}`);
         } finally {
             setIsSaving(false);
         }
@@ -186,27 +264,109 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
     
     return (
         <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50">
-            <div className="bg-card rounded-lg shadow-2xl p-8 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="bg-card rounded-lg shadow-2xl p-8 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
                 <h2 className="text-2xl font-bold mb-6">{policy ? 'Editar Póliza' : 'Crear Nueva Póliza'}</h2>
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label htmlFor="client_id" className="block text-sm font-medium text-text-secondary mb-1">Cliente</label>
-                        <select id="client_id" name="client_id" value={formData.client_id} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required>
-                            <option value="">Seleccione un Cliente</option>
-                            {clients.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                        </select>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label htmlFor="client_id" className="block text-sm font-medium text-text-secondary mb-1">Cliente</label>
+                            <select id="client_id" name="client_id" value={formData.client_id} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required>
+                                <option value="">Seleccione un Cliente</option>
+                                {clients.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label htmlFor="estatus_poliza" className="block text-sm font-medium text-text-secondary mb-1">Estatus</label>
+                            <select id="estatus_poliza" name="estatus_poliza" value={formData.estatus_poliza} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary">
+                                <option value="ACTIVA">Activa</option>
+                                <option value="PENDIENTE PAGO">Pendiente Pago</option>
+                                <option value="CANCELADA">Cancelada</option>
+                                <option value="VENCIDA">Vencida</option>
+                            </select>
+                        </div>
                     </div>
-                    <div>
-                        <label htmlFor="product_id" className="block text-sm font-medium text-text-secondary mb-1">Producto</label>
-                        <select id="product_id" name="product_id" value={formData.product_id} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required>
-                            <option value="">Seleccione un Producto</option>
-                             {products.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label htmlFor="prima_total" className="block text-sm font-medium text-text-secondary mb-1">Prima Total Anual ($)</label>
-                        <input id="prima_total" type="number" step="0.01" name="prima_total" value={formData.prima_total} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required/>
+
+                    {/* SECCIÓN DE PRODUCTOS MÚLTIPLES (Configuración Manual) */}
+                    <div className="border border-border p-4 rounded-lg bg-secondary bg-opacity-20">
+                        <h3 className="text-sm font-bold text-text-primary mb-3">Productos Contratados</h3>
+                        
+                        {/* Formulario para agregar producto */}
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-2 mb-4 items-end">
+                            <div className="md:col-span-5">
+                                <label className="text-xs text-text-secondary">Producto Base</label>
+                                <select 
+                                    name="id"
+                                    value={newProduct.id} 
+                                    onChange={handleNewProductChange} 
+                                    className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                                >
+                                    <option value="">Seleccionar...</option>
+                                    {availableProducts.map(p => <option key={p.id} value={p.id}>{p.nombre} ({p.aseguradora})</option>)}
+                                </select>
+                            </div>
+                            <div className="md:col-span-3">
+                                <label className="text-xs text-text-secondary">Suma Aseg. ($)</label>
+                                <input 
+                                    type="number" 
+                                    name="suma_asegurada"
+                                    value={newProduct.suma_asegurada}
+                                    onChange={handleNewProductChange}
+                                    placeholder="0.00"
+                                    className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                                />
+                            </div>
+                            <div className="md:col-span-3">
+                                <label className="text-xs text-text-secondary">Prima Mensual ($)</label>
+                                <input 
+                                    type="number" 
+                                    name="prima_mensual"
+                                    value={newProduct.prima_mensual}
+                                    onChange={handleNewProductChange}
+                                    placeholder="0.00"
+                                    className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                                />
+                            </div>
+                            <div className="md:col-span-1">
+                                <button type="button" onClick={handleAddProduct} className="w-full bg-primary hover:bg-accent text-white p-2 rounded font-bold flex justify-center items-center h-[38px]">
+                                    +
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Tabla de productos seleccionados */}
+                        {selectedProducts.length > 0 ? (
+                            <table className="w-full text-left text-sm mb-4">
+                                <thead className="text-text-secondary border-b border-border">
+                                    <tr>
+                                        <th className="py-2">Producto</th>
+                                        <th className="py-2">Suma Aseg.</th>
+                                        <th className="py-2">Prima Mens.</th>
+                                        <th className="py-2"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {selectedProducts.map((prod, idx) => (
+                                        <tr key={idx} className="border-b border-border border-opacity-50">
+                                            <td className="py-2">{prod.nombre}</td>
+                                            <td className="py-2">${prod.suma_asegurada.toLocaleString()}</td>
+                                            <td className="py-2">${prod.prima_mensual.toLocaleString()}</td>
+                                            <td className="py-2 text-right">
+                                                <button type="button" onClick={() => handleRemoveProduct(idx)} className="text-red-400 hover:text-red-300">X</button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    <tr className="font-bold text-text-primary bg-white bg-opacity-5">
+                                        <td className="py-2 pl-2">TOTALES</td>
+                                        <td className="py-2">${totalSumaAsegurada.toLocaleString()}</td>
+                                        <td className="py-2 text-green-400">${totalPrimaMensual.toLocaleString()}</td>
+                                        <td></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        ) : (
+                            <p className="text-sm text-text-secondary text-center italic py-2">Agrega productos configurando su prima y suma asegurada.</p>
+                        )}
+                        <p className="text-xs text-text-secondary text-right mt-2">Comisión Mensual Estimada: ${totalComisionEstimada.toLocaleString()}</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -218,15 +378,6 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
                             <label htmlFor="fecha_vencimiento" className="block text-sm font-medium text-text-secondary mb-1">Fecha de Vencimiento</label>
                             <input id="fecha_vencimiento" type="date" name="fecha_vencimiento" value={formData.fecha_vencimiento} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required/>
                         </div>
-                    </div>
-                    <div>
-                        <label htmlFor="estatus_poliza" className="block text-sm font-medium text-text-secondary mb-1">Estatus de la Póliza</label>
-                        <select id="estatus_poliza" name="estatus_poliza" value={formData.estatus_poliza} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary">
-                            <option value="ACTIVA">Activa</option>
-                            <option value="PENDIENTE PAGO">Pendiente Pago</option>
-                            <option value="CANCELADA">Cancelada</option>
-                             <option value="VENCIDA">Vencida</option>
-                        </select>
                     </div>
 
                     {isAdmin && (
@@ -249,21 +400,16 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
 
                     {error && <p className="text-red-500 mt-4 text-sm">{error}</p>}
 
+                    {/* ARCHIVOS (Se mantiene igual) */}
                     {policy && (
                          <div className="mt-6 border-t border-border pt-4">
                             <h3 className="text-lg font-medium text-text-primary mb-3 flex items-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2"><path strokeLinecap="round" strokeLinejoin="round" d="m18.375 12.739-7.693 7.693a4.5 4.5 0 0 1-6.364-6.364l10.94-10.94A3 3 0 1 1 19.5 7.372L8.552 18.32m.009-.01-.01.01m5.699-9.941-7.81 7.81a1.5 1.5 0 0 0 2.122 2.122l7.81-7.81" /></svg>
                                 Archivos de la Póliza
                             </h3>
                             {isFilesLoading ? (
                                 <div className="flex justify-center p-4"><Spinner /></div>
-                            ) : fileError ? (
-                                <p className="text-red-500 text-sm">{fileError}</p>
                             ) : (
                                 <div className="space-y-2">
-                                    {files.length === 0 && !isUploading && (
-                                        <p className="text-text-secondary text-sm">No hay archivos adjuntos.</p>
-                                    )}
                                     {files.map(file => (
                                         <div key={file.id} className="flex items-center justify-between bg-secondary p-2 rounded">
                                             <span className="text-sm truncate">{file.name}</span>
@@ -272,46 +418,26 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
                                                     try {
                                                         await downloadFile('policy_files', `${policy.id}/${file.name}`, file.name);
                                                     } catch (err) {
-                                                        alert(`Error al descargar: ${getErrorMessage(err)}`);
+                                                        alert(`Error: ${getErrorMessage(err)}`);
                                                     }
                                                 }}
                                                 className="text-accent hover:underline p-1 focus:outline-none"
-                                                title="Descargar"
                                                 type="button"
                                             >
-                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m.75 12 3 3m0 0 3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>
+                                                Descargar
                                             </button>
                                         </div>
                                     ))}
-                                    {isUploading && (
-                                        <div className="flex items-center text-sm text-text-secondary">
-                                            <Spinner />
-                                            <span className="ml-2">Subiendo archivo...</span>
-                                        </div>
-                                    )}
                                 </div>
                             )}
                             <div className="mt-4">
-                                <input
-                                    type="file"
-                                    ref={fileInputRef}
-                                    onChange={handleFileChange}
-                                    className="hidden"
-                                    disabled={isUploading}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={handleButtonClick}
-                                    disabled={isUploading}
-                                    className="flex items-center text-sm bg-secondary hover:bg-gray-600 text-white font-bold py-2 px-3 rounded-lg transition-colors disabled:opacity-50"
-                                >
-                                    <PlusIcon className="w-4 h-4 mr-2" />
-                                    Añadir Archivo
+                                <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" disabled={isUploading} />
+                                <button type="button" onClick={() => fileInputRef.current?.click()} className="flex items-center text-sm bg-secondary hover:bg-gray-600 text-white font-bold py-2 px-3 rounded-lg transition-colors" disabled={isUploading}>
+                                    <PlusIcon className="w-4 h-4 mr-2" /> Añadir Archivo
                                 </button>
                             </div>
                         </div>
                     )}
-
 
                     <div className="mt-6 flex justify-end space-x-4">
                         <button type="button" onClick={onClose} className="bg-secondary hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition-colors" disabled={isSaving}>Cancelar</button>

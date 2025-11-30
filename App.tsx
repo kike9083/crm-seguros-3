@@ -14,8 +14,9 @@ import { Profile } from './types';
 import Reports from './components/Reports';
 import Guide from './components/Guide';
 import LeadsList from './components/LeadsList';
+import CommissionsList from './components/CommissionsList';
 
-type View = 'dashboard' | 'pipeline' | 'leads-list' | 'clients' | 'tasks' | 'policies' | 'products' | 'settings' | 'reports' | 'guide';
+type View = 'dashboard' | 'pipeline' | 'leads-list' | 'clients' | 'tasks' | 'policies' | 'products' | 'settings' | 'reports' | 'guide' | 'commissions';
 
 interface MainAppProps {
     profile: Profile;
@@ -26,28 +27,18 @@ const MainApp: React.FC<MainAppProps> = ({ profile }) => {
 
     const renderView = React.useCallback(() => {
         switch (currentView) {
-            case 'dashboard':
-                return <Dashboard />;
-            case 'pipeline':
-                return <PipelineBoard />;
-            case 'leads-list':
-                return <LeadsList />;
-            case 'clients':
-                return <ClientsList />;
-            case 'tasks':
-                return <TasksBoard />;
-            case 'policies':
-                return <PoliciesList />;
-            case 'products':
-                return <ProductsList />;
-            case 'settings':
-                return <Settings />;
-            case 'reports':
-                return <Reports />;
-            case 'guide':
-                return <Guide />;
-            default:
-                return <Dashboard />;
+            case 'dashboard': return <Dashboard />;
+            case 'pipeline': return <PipelineBoard />;
+            case 'leads-list': return <LeadsList />;
+            case 'clients': return <ClientsList />;
+            case 'tasks': return <TasksBoard />;
+            case 'policies': return <PoliciesList />;
+            case 'products': return <ProductsList />;
+            case 'settings': return <Settings />;
+            case 'reports': return <Reports />;
+            case 'guide': return <Guide />;
+            case 'commissions': return <CommissionsList />;
+            default: return <Dashboard />;
         }
     }, [currentView]);
 
@@ -63,7 +54,6 @@ const MainApp: React.FC<MainAppProps> = ({ profile }) => {
         </div>
     );
 };
-
 
 const App: React.FC = () => {
     return (

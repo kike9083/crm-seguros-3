@@ -1,3 +1,4 @@
+
 import React from 'react';
 import ChartBarIcon from './icons/ChartBarIcon';
 import UserGroupIcon from './icons/UserGroupIcon';
@@ -8,9 +9,10 @@ import PresentationChartLineIcon from './icons/PresentationChartLineIcon';
 import TagIcon from './icons/TagIcon';
 import InformationCircleIcon from './icons/InformationCircleIcon';
 import ListBulletIcon from './icons/ListBulletIcon';
+import CurrencyDollarIcon from './icons/CurrencyDollaricon';
 import { Profile } from '../types';
 
-type View = 'dashboard' | 'pipeline' | 'leads-list' | 'clients' | 'tasks' | 'policies' | 'products' | 'settings' | 'reports' | 'guide';
+type View = 'dashboard' | 'pipeline' | 'leads-list' | 'clients' | 'tasks' | 'policies' | 'products' | 'settings' | 'reports' | 'guide' | 'commissions';
 
 interface SideNavProps {
     currentView: View;
@@ -25,16 +27,16 @@ const navItems = [
     { id: 'clients', label: 'Clientes', icon: UserGroupIcon, roles: ['ADMIN', 'AGENTE'] },
     { id: 'tasks', label: 'Tareas', icon: ClipboardListIcon, roles: ['ADMIN', 'AGENTE'] },
     { id: 'policies', label: 'Pólizas', icon: DocumentTextIcon, roles: ['ADMIN', 'AGENTE'] },
+    { id: 'commissions', label: 'Comisiones', icon: CurrencyDollarIcon, roles: ['ADMIN', 'AGENTE'] },
     { id: 'products', label: 'Productos', icon: TagIcon, roles: ['ADMIN', 'AGENTE'] },
     { id: 'reports', label: 'Reportes', icon: PresentationChartLineIcon, roles: ['ADMIN', 'AGENTE'] },
     { id: 'guide', label: 'Guía', icon: InformationCircleIcon, roles: ['ADMIN', 'AGENTE'] },
     { id: 'settings', label: 'Configuración', icon: CogIcon, roles: ['ADMIN', 'AGENTE'] },
 ] as const;
 
-
 const SideNav: React.FC<SideNavProps> = ({ currentView, setCurrentView, profile }) => {
     return (
-        <nav className="w-20 lg:w-64 bg-card p-2 lg:p-4 flex flex-col border-r border-border">
+        <nav className="w-20 lg:w-64 bg-card p-2 lg:p-4 flex flex-col border-r border-border h-full overflow-y-auto">
             <div className="flex items-center justify-center lg:justify-start mb-10">
                 <div className="w-12 h-12 bg-primary rounded-full flex items-center justify-center text-white text-2xl font-bold">
                   S
@@ -47,7 +49,7 @@ const SideNav: React.FC<SideNavProps> = ({ currentView, setCurrentView, profile 
                 }).map(item => (
                     <li key={item.id}>
                         <button
-                            onClick={() => setCurrentView(item.id)}
+                            onClick={() => setCurrentView(item.id as View)}
                             className={`w-full flex items-center p-3 rounded-lg transition-colors
                                 ${currentView === item.id ? 'bg-accent text-white' : 'hover:bg-secondary text-text-secondary'}`}
                         >

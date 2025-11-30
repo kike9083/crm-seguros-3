@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { createProduct, updateProduct, getErrorMessage } from '../services/api';
 import { Product } from '../types';
@@ -20,13 +19,12 @@ const PRODUCT_CATEGORIES = [
 ];
 
 const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, onSave }) => {
-    // Allow numeric fields to be string during editing to support empty input
     const [formData, setFormData] = useState({
         nombre: '',
-        aseguradora: '',
-        categoria: 'Vida', // Default to first meaningful category
+        aseguradora: 'PALIG', // Default por solicitud
+        categoria: 'Vida', 
         comision_porcentaje: 0 as string | number,
-        precio_base: 0 as string | number,
+        // prima_mensual y suma_asegurada eliminados de aquí, se definen en la póliza
         activo: true,
         descripcion: ''
     });
@@ -37,10 +35,9 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, onSave })
         if (product) {
             setFormData({
                 nombre: product.nombre || '',
-                aseguradora: product.aseguradora || '',
+                aseguradora: product.aseguradora || 'PALIG',
                 categoria: product.categoria || 'Vida',
                 comision_porcentaje: product.comision_porcentaje || 0,
-                precio_base: product.precio_base || 0,
                 activo: product.activo,
                 descripcion: product.descripcion || ''
             });
@@ -66,7 +63,9 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, onSave })
         const dataToSave = {
             ...formData,
             comision_porcentaje: parseFloat(String(formData.comision_porcentaje)),
-            precio_base: parseFloat(String(formData.precio_base))
+            // Enviamos 0 o null para los campos eliminados para mantener compatibilidad con la API existente
+            prima_mensual: 0,
+            suma_asegurada: 0
         }
 
         try {
@@ -113,16 +112,14 @@ const ProductModal: React.FC<ProductModalProps> = ({ product, onClose, onSave })
                             </select>
                         </div>
                     </div>
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                         <div>
-                             <label htmlFor="precio_base" className="block text-sm font-medium text-text-secondary mb-1">Precio Base ($)</label>
-                             <input id="precio_base" type="number" step="0.01" name="precio_base" value={formData.precio_base} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required/>
-                         </div>
-                          <div>
-                             <label htmlFor="comision_porcentaje" className="block text-sm font-medium text-text-secondary mb-1">% Comisión</label>
-                            <input id="comision_porcentaje" type="number" step="0.01" name="comision_porcentaje" value={formData.comision_porcentaje} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required/>
-                         </div>
-                    </div>
+                    
+                    {/* Campos eliminados: Prima Mensual y Suma Asegurada se definen ahora en la póliza */}
+
+                    <div>
+                         <label htmlFor="comision_porcentaje" className="block text-sm font-medium text-text-secondary mb-1">% Comisión Agente</label>
+                        <input id="comision_porcentaje" type="number" step="0.01" name="comision_porcentaje" value={formData.comision_porcentaje} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required/>
+                        <p className="text-xs text-text-secondary mt-1">Porcentaje base para calcular la comisión en la póliza.</p>
+                     </div>
                     <div>
                         <label htmlFor="descripcion" className="block text-sm font-medium text-text-secondary mb-1">Descripción</label>
                         <textarea id="descripcion" name="descripcion" value={formData.descripcion} onChange={handleChange} rows={3} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary"></textarea>

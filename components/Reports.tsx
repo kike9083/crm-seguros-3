@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     getExpiringPolicies, 
@@ -68,7 +69,7 @@ const Reports: React.FC = () => {
                 setTasks(results[5] as unknown as Task[]);
                 
                 if (isAdmin && results[6]) {
-                    setAuditLogs(results[6] as AuditLog[]);
+                    setAuditLogs(results[6] as unknown as AuditLog[]);
                 }
 
             } catch (err) {

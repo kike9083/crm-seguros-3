@@ -18,10 +18,10 @@ const viewTitles: { [key: string]: string } = {
     settings: 'Configuración',
     reports: 'Reportes',
     guide: 'Guía de Uso',
+    commissions: 'Comisiones',
 };
 
 const Header: React.FC<HeaderProps> = ({ currentView, profile }) => {
-    
     const handleSignOut = async () => {
         await signOut();
     }
