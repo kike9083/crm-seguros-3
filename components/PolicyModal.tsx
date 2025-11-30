@@ -92,14 +92,9 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
             } 
             // 2. Fallback: Si no hay detalle JSON (póliza antigua), reconstruir desde 'product_id'
             else if (policy.product_id) {
-                // Buscamos el producto base en la lista de disponibles (aunque esté inactivo, deberíamos poder verlo, 
-                // pero aquí dependemos de availableProducts que filtra activos. 
-                // Idealmente deberíamos buscar en todos los productos).
+                // Buscamos el producto base en la lista de disponibles.
                 // Nota: availableProducts se carga asíncronamente, esto podría fallar si se ejecuta antes de fetchData.
                 // Sin embargo, como es solo visualización inicial, intentaremos mapearlo lo mejor posible.
-                
-                // Si availableProducts aún no cargó, no podremos mapear el nombre aquí mismo.
-                // Pero podemos crear un objeto temporal con lo que tenemos en la póliza.
                 
                 // Intentamos usar la relación 'products' si vino del backend (join)
                 const legacyProduct = Array.isArray(policy.products) ? policy.products[0] : policy.products;
@@ -134,7 +129,7 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
             setSelectedProducts([]);
             setFiles([]);
         }
-    }, [policy, user, isAdmin, fetchFiles]); // Removido availableProducts de dependencias para evitar loops, la lógica de legacy es best-effort
+    }, [policy, user, isAdmin, fetchFiles]); 
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
@@ -181,7 +176,8 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
                 prima_mensual: prima,
                 suma_asegurada: suma,
                 comision_porcentaje: prodBase.comision_porcentaje,
-                comision_generada: (prima * (prodBase.comision_porcentaje / 100)) * 12 // Estimado anual
+                // Se guarda la comisión MENSUAL por producto
+                comision_generada: (prima * (prodBase.comision_porcentaje / 100)) 
             };
             setSelectedProducts([...selectedProducts, newDetail]);
             

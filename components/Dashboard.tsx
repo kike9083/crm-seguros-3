@@ -45,15 +45,15 @@ const GoalSettingModal: React.FC<{
                 <h2 className="text-xl font-bold mb-4">Configurar Metas Mensuales ($)</h2>
                 <div className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-text-secondary mb-1">Meta Vida</label>
+                        <label className="block text-sm font-medium text-text-secondary mb-1">Meta Vida (Comisión)</label>
                         <input type="number" name="vida" value={formData.vida} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-text-secondary mb-1">Meta AP (Accidentes Personales)</label>
+                        <label className="block text-sm font-medium text-text-secondary mb-1">Meta AP (Comisión)</label>
                         <input type="number" name="ap" value={formData.ap} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-text-secondary mb-1">Meta Salud (GMM)</label>
+                        <label className="block text-sm font-medium text-text-secondary mb-1">Meta Salud (Comisión)</label>
                         <input type="number" name="salud" value={formData.salud} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
                     </div>
                 </div>
@@ -145,50 +145,63 @@ const Dashboard: React.FC = () => {
                 setOpsStats({ pendingMeetings, contactsMade, interestedLeads, meetingsThisWeek });
                 setTasks(allTasks);
 
-                // Cálculo de Ventas (Robusto)
-                let salesVida = 0;
-                let salesAP = 0;
-                let salesSalud = 0;
+                // Cálculo de Ventas (Basado en COMISIONES MENSUALES)
+                let comisionVida = 0;
+                let comisionAP = 0;
+                let comisionSalud = 0;
 
                 allPolicies.forEach(p => {
-                    // Usar fecha de emisión si existe, sino created_at
-                    const pDate = new Date(p.fecha_emision || p.created_at);
+                    const dateString = p.fecha_emision || p.created_at;
+                    const safeDateString = dateString.includes('T') ? dateString : `${dateString}T00:00:00`;
+                    const pDate = new Date(safeDateString);
                     
-                    // Solo sumar si es ACTIVA y del MES/AÑO actual
                     if (p.estatus_poliza === 'ACTIVA' && pDate.getMonth() === currentMonth && pDate.getFullYear() === currentYear) {
                          
                          let hasDetails = false;
 
-                         // 1. Intento con nuevo esquema (JSONB)
+                         // 1. Intento con nuevo esquema (JSONB) - Multi-producto
                          if (p.productos_detalle && p.productos_detalle.length > 0) {
                              hasDetails = true;
                              p.productos_detalle.forEach(prod => {
-                                 const cat = (prod.categoria || '').toLowerCase();
-                                 const prima = Number(prod.prima_mensual) || 0;
+                                 const cat = (prod.categoria || '').toLowerCase().trim();
                                  
-                                 if (cat.includes('vida') || cat.includes('life')) salesVida += prima;
-                                 else if (cat.includes('ap') || cat.includes('accidente')) salesAP += prima;
-                                 else if (cat.includes('salud') || cat.includes('gmm') || cat.includes('médico') || cat.includes('medico')) salesSalud += prima;
+                                 // FIX: Calcular comisión mensual explícitamente (Prima Mensual * %)
+                                 // Ignoramos 'comision_generada' almacenada porque antes se multiplicaba por 12 (anual)
+                                 const prima = Number(prod.prima_mensual) || 0;
+                                 const porcentaje = Number(prod.comision_porcentaje) || 0;
+                                 const comisionMensual = prima * (porcentaje / 100);
+                                 
+                                 if (cat === 'vida' || cat.includes('vida') || cat.includes('life')) {
+                                     comisionVida += comisionMensual;
+                                 } else if (cat === 'ap' || cat === 'accidentes personales' || cat.includes('accidente')) {
+                                     comisionAP += comisionMensual;
+                                 } else if (cat === 'salud' || cat.includes('salud') || cat.includes('gmm') || cat.includes('médico') || cat.includes('medico')) {
+                                     comisionSalud += comisionMensual;
+                                 }
                              });
                          } 
                          
-                         // 2. Fallback a esquema antiguo (Relación) si no hay detalles JSON
+                         // 2. Fallback a esquema antiguo (Relación)
                          if (!hasDetails) {
                              const prod = Array.isArray(p.products) ? p.products[0] : p.products;
                              if (prod) {
-                                 const category = (prod.categoria || prod.nombre || '').toLowerCase();
-                                 // Usar prima_total de la póliza como fallback
-                                 const prima = Number(p.prima_total) || 0;
+                                 const category = (prod.categoria || '').toLowerCase().trim();
+                                 // Usar comision_agente de la póliza completa como fallback
+                                 const comision = Number(p.comision_agente) || 0;
 
-                                 if (category.includes('vida') || category.includes('life')) salesVida += prima;
-                                 else if (category.includes('ap') || category.includes('accidente')) salesAP += prima;
-                                 else if (category.includes('salud') || category.includes('gmm') || category.includes('médico') || category.includes('medico')) salesSalud += prima;
+                                 if (category === 'vida' || category.includes('vida') || category.includes('life')) {
+                                     comisionVida += comision;
+                                 } else if (category === 'ap' || category === 'accidentes personales' || category.includes('accidente')) {
+                                     comisionAP += comision;
+                                 } else if (category === 'salud' || category.includes('salud') || category.includes('gmm') || category.includes('médico') || category.includes('medico')) {
+                                     comisionSalud += comision;
+                                 }
                              }
                          }
                     }
                 });
 
-                setActualSales({ vida: salesVida, ap: salesAP, salud: salesSalud });
+                setActualSales({ vida: comisionVida, ap: comisionAP, salud: comisionSalud });
 
             } catch (err) {
                 setError(`Error cargando datos: ${getErrorMessage(err)}`);
@@ -234,7 +247,7 @@ const Dashboard: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 bg-card p-6 rounded-lg shadow-lg relative">
                      <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-xl font-bold">Progreso de Metas Mensuales</h2>
+                        <h2 className="text-xl font-bold">Progreso de Metas Mensuales (Comisiones)</h2>
                         <button onClick={() => setShowGoalModal(true)} className="flex items-center text-sm text-accent hover:text-white transition-colors">
                             <CogIcon className="w-5 h-5 mr-1"/> Configurar Meta
                         </button>
@@ -250,7 +263,7 @@ const Dashboard: React.FC = () => {
                             <p className="font-bold text-lg">${(monthlyGoal.vida + monthlyGoal.ap + monthlyGoal.salud).toLocaleString()}</p>
                         </div>
                         <div>
-                            <p className="text-xs text-text-secondary">Venta Real</p>
+                            <p className="text-xs text-text-secondary">Comisión Real</p>
                             <p className="font-bold text-lg">${(actualSales.vida + actualSales.ap + actualSales.salud).toLocaleString()}</p>
                         </div>
                         <div>

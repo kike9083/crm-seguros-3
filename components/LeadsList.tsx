@@ -4,10 +4,10 @@ import { Lead, Profile } from '../types';
 import Spinner from './Spinner';
 import LeadModal from './LeadModal';
 import ConfirmationModal from './ConfirmationModal';
-import ImportModal from './ImportModal'; // Importar el nuevo modal
+import ImportModal from './ImportModal'; 
 import PlusIcon from './icons/PlusIcon';
 import WhatsAppIcon from './icons/WhatsAppIcon';
-import CloudArrowUpIcon from './icons/CloudArrowUpIcon'; // Importar nuevo icono
+import CloudArrowUpIcon from './icons/CloudArrowUpIcon'; 
 import { useAuth } from './auth/AuthContext';
 import { STATUS_COLORS } from '../constants';
 
@@ -19,10 +19,12 @@ const LeadsList: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [isImportModalOpen, setIsImportModalOpen] = useState(false); // Estado para el modal de importación
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false); 
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [leadToDelete, setLeadToDelete] = useState<Lead | null>(null);
     
+    const isAdmin = profile?.rol === 'ADMIN';
+
     // Estados para filtros
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedAgentId, setSelectedAgentId] = useState('');

@@ -94,12 +94,42 @@ const PoliciesList: React.FC = () => {
         }
     };
 
-    const getRelatedName = (relation: { nombre: string } | { nombre: string }[] | null | undefined): string => {
+    // Helper ultra-robusto para obtener nombres de relaciones
+    const getRelatedName = (relation: any): string => {
         if (!relation) return 'N/A';
+        
+        // Caso 1: Es un array (Supabase devuelve esto en joins 1:N o N:N a veces)
         if (Array.isArray(relation)) {
-            return relation.length > 0 ? relation[0].nombre : 'N/A';
+            if (relation.length > 0 && relation[0].nombre) {
+                return relation[0].nombre;
+            }
+            return 'N/A';
         }
-        return relation.nombre;
+        
+        // Caso 2: Es un objeto directo
+        if (typeof relation === 'object' && relation !== null) {
+            if (relation.nombre) return relation.nombre;
+        }
+        
+        return 'N/A';
+    };
+
+    // Helper específico para mostrar los productos de la póliza
+    const getProductDisplay = (policy: Policy) => {
+        // 1. Prioridad: Mostrar desde 'productos_detalle' (nuevo formato multi-producto)
+        if (policy.productos_detalle && Array.isArray(policy.productos_detalle) && policy.productos_detalle.length > 0) {
+            return (
+                <div className="flex flex-col space-y-1">
+                    {policy.productos_detalle.map((prod, idx) => (
+                        <span key={idx} className="text-xs bg-gray-700 px-2 py-0.5 rounded inline-block w-fit">
+                            {prod.nombre}
+                        </span>
+                    ))}
+                </div>
+            );
+        }
+        // 2. Fallback: Mostrar desde relación 'products' (legacy)
+        return <span className="text-text-secondary">{getRelatedName(policy.products)}</span>;
     };
     
     if (loading) return <div className="flex justify-center items-center h-full"><Spinner /></div>;
@@ -122,7 +152,7 @@ const PoliciesList: React.FC = () => {
                         <thead className="border-b border-border">
                             <tr>
                                 <th className="p-4">Cliente</th>
-                                <th className="p-4">Producto</th>
+                                <th className="p-4">Producto(s)</th>
                                 <th className="p-4">Prima Total</th>
                                 <th className="p-4">Comisión Agente</th>
                                 <th className="p-4">Agente</th>
@@ -135,11 +165,17 @@ const PoliciesList: React.FC = () => {
                             {policies.map(policy => (
                                 <tr key={policy.id} className="border-b border-border hover:bg-secondary">
                                     <td className="p-4 font-medium">{getRelatedName(policy.clients)}</td>
-                                    <td className="p-4 text-text-secondary">{getRelatedName(policy.products)}</td>
-                                    <td className="p-4 text-text-secondary">${policy.prima_total.toLocaleString()}</td>
-                                    <td className="p-4 text-text-secondary">${policy.comision_agente.toLocaleString()}</td>
+                                    <td className="p-4">
+                                        {getProductDisplay(policy)}
+                                    </td>
+                                    <td className="p-4 text-text-secondary font-mono">
+                                        ${Number(policy.prima_total).toLocaleString()}
+                                    </td>
+                                    <td className="p-4 text-text-secondary font-mono text-green-400">
+                                        ${Number(policy.comision_agente).toLocaleString()}
+                                    </td>
                                     <td className="p-4 text-blue-300">{policy.agent_id ? agentMap.get(policy.agent_id) : 'N/A'}</td>
-                                    <td className="p-4 text-text-secondary">{new Date(policy.fecha_vencimiento).toLocaleDateString()}</td>
+                                    <td className="p-4 text-text-secondary text-sm">{new Date(policy.fecha_vencimiento).toLocaleDateString()}</td>
                                     <td className="p-4">
                                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(policy.estatus_poliza)}`}>
                                             {policy.estatus_poliza}
@@ -170,7 +206,7 @@ const PoliciesList: React.FC = () => {
             <ConfirmationModal
                 isOpen={isConfirmModalOpen}
                 title="Confirmar Eliminación de Póliza"
-                message={`¿Estás seguro de que quieres eliminar la póliza para "${getRelatedName(policyToDelete?.clients)}"? Esta acción no se puede deshacer.`}
+                message={`¿Estás seguro de que quieres eliminar esta póliza? Esta acción no se puede deshacer.`}
                 onConfirm={handleConfirmDelete}
                 onCancel={handleCancelDelete}
                 confirmText="Eliminar"

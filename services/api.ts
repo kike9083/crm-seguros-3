@@ -2,8 +2,10 @@ import { supabase } from './supabaseClient';
 import { Lead, Client, Policy, Task, Product, Profile, UserRole, FileObject, LeadStatus, MonthlyGoal, AuditLog } from '../types';
 import { AuthError, Session, User } from '@supabase/supabase-js';
 
+// Re-export supabase client for direct use in other modules if needed
 export { supabase };
 
+// Utility to get a readable error message
 export const getErrorMessage = (error: unknown): string => {
     if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string') {
         return error.message;
@@ -11,18 +13,47 @@ export const getErrorMessage = (error: unknown): string => {
     if (typeof error === 'string') {
         return error;
     }
-    return 'Ocurrió un error inesperado.';
+    return 'Ocurrió un error inesperado. Por favor, revise la consola para más detalles.';
 };
 
+// Utility to sanitize filenames for storage
 export const sanitizeFileName = (name: string): string => {
     return name
-        .normalize("NFD") 
-        .replace(/[\u0300-\u036f]/g, "") 
-        .replace(/\s+/g, '_') 
-        .replace(/[^a-zA-Z0-9.\-_]/g, ''); 
+        .normalize("NFD") // Decompose accents
+        .replace(/[\u0300-\u036f]/g, "") // Remove accents
+        .replace(/\s+/g, '_') // Replace spaces with underscores
+        .replace(/[^a-zA-Z0-9.\-_]/g, ''); // Remove non-url-safe chars
 };
 
-// ... (Auth functions remain the same) ...
+// --- AUDIT LOGGING HELPER ---
+const logActivity = async (action: string, entity: string, entityId?: string, details?: object) => {
+    try {
+        await supabase.rpc('log_activity', {
+            p_action: action,
+            p_entity: entity,
+            p_entity_id: entityId,
+            p_details: details
+        });
+    } catch (e) {
+        console.error("Failed to log activity:", e);
+    }
+};
+
+// --- AUDIT LOGS FETCH ---
+export const getAuditLogs = async () => {
+    // Eliminamos el join 'profiles(nombre, rol)' que causaba error.
+    // Resolveremos el nombre del usuario en el frontend.
+    const { data, error } = await supabase
+        .from('audit_logs')
+        .select('*') 
+        .order('created_at', { ascending: false })
+        .limit(200);
+        
+    if (error) throw error;
+    return data as unknown as AuditLog[];
+};
+
+
 // Auth
 export const signInWithPassword = async (email: string, password: string): Promise<{ session: Session | null; error: AuthError | null }> => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -36,7 +67,7 @@ export const signUp = async (email: string, password: string, nombre: string): P
         options: {
             data: {
                 nombre: nombre,
-                rol: 'AGENTE' 
+                rol: 'AGENTE' // Default role for new signups
             }
         }
     });
@@ -79,7 +110,7 @@ export const getProfile = async (userId: string): Promise<Profile | null> => {
         .select('*')
         .eq('id', userId)
         .single();
-    if (error && error.code !== 'PGRST116') { 
+    if (error && error.code !== 'PGRST116') { // PGRST116: 'exact-one-row-not-found'
         console.error("Error fetching profile:", error);
         throw error;
     }
@@ -112,47 +143,32 @@ export const updateProfileData = async (id: string, updates: Partial<Profile>) =
         .eq('id', id)
         .select()
         .single();
+    
     if (error) throw error;
+    
+    // Also update auth metadata to keep it in sync
     if (updates.nombre) {
         await updateUserMetadata({ nombre: updates.nombre });
     }
+    
     return data as Profile;
 };
 
 export const createNewUser = async (email: string, password: string, nombre: string, rol: UserRole) => {
     const { data, error } = await supabase.rpc('create_new_user', {
-        email, password, nombre, rol
+        email,
+        password,
+        nombre,
+        rol
     });
     if(error) throw error;
     return data;
 }
 
-// ... (Lead, Client, Audit logic remains the same, just keeping imports clean) ...
-const logActivity = async (action: string, entity: string, entityId?: string, details?: object) => {
-    try {
-        await supabase.rpc('log_activity', {
-            p_action: action,
-            p_entity: entity,
-            p_entity_id: entityId,
-            p_details: details
-        });
-    } catch (e) {
-        console.error("Failed to log activity:", e);
-    }
-};
-
-export const getAuditLogs = async () => {
-    const { data, error } = await supabase
-        .from('audit_logs')
-        .select('*') 
-        .order('created_at', { ascending: false })
-        .limit(200);
-    if (error) throw error;
-    return data as unknown as AuditLog[];
-};
-
+// Leads
 export const getLeads = async () => {
     const { data, error } = await supabase.rpc('get_leads_for_user');
+        
     if (error) throw error;
     return data as Lead[];
 };
@@ -180,8 +196,12 @@ export const bulkCreateLeads = async (leadsData: any[]) => {
         .from('leads')
         .insert(leadsData)
         .select();
+    
     if (error) throw error;
+
+    // Log de auditoría
     await logActivity('IMPORT', 'LEAD', undefined, { count: leadsData.length });
+
     return data;
 };
 
@@ -207,6 +227,7 @@ export const updateLead = async (id: number, updates: Omit<Lead, 'id' | 'created
 export const deleteLead = async (id: number) => {
     const { error } = await supabase.rpc('delete_lead_secure', { p_id: id });
     if (error) throw error;
+    // Log de auditoría
     await logActivity('DELETE', 'LEAD', String(id));
 };
 
@@ -216,6 +237,7 @@ export const promoteLeadToClient = async (leadId: number) => {
     return data;
 };
 
+// Clients
 export const getClients = async () => {
     const { data, error } = await supabase.rpc('get_clients_for_user');
     if (error) throw error;
@@ -241,30 +263,34 @@ export const updateClient = async (id: number, updates: Omit<Client, 'id' | 'cre
 export const deleteClient = async (id: number) => {
     const { error } = await supabase.rpc('delete_client_secure', { p_id: id });
     if (error) throw error;
+    // Log de auditoría
     await logActivity('DELETE', 'CLIENT', String(id));
 };
 
-// --- UPDATED POLICY FUNCTIONS ---
-
+// Policies
 export const getPolicies = async () => {
-    const { data, error } = await supabase.rpc('get_policies_for_user');
+    // IMPORTANTE: Encadenamos .select() para traer los datos de las relaciones
+    // Esto permite que 'clients' y 'products' vengan llenos y no nulos
+    const { data, error } = await supabase
+        .rpc('get_policies_for_user')
+        .select('*, clients(nombre), products(nombre, categoria)'); 
+        
     if (error) throw error;
     return data as unknown as Policy[];
 };
 
 export const createPolicy = async (policyData: Omit<Policy, 'id' | 'created_at' | 'clients' | 'products'>) => {
-    // Calcular totales si no vienen calculados
     const { data, error } = await supabase.rpc('create_policy_secure', {
         p_client_id: policyData.client_id,
-        p_product_id: policyData.product_id, // Main product ID
-        p_prima_total: policyData.prima_total, // Now represents Monthly Total
+        p_product_id: policyData.product_id,
+        p_prima_total: policyData.prima_total,
         p_fecha_emision: policyData.fecha_emision,
         p_fecha_vencimiento: policyData.fecha_vencimiento,
         p_estatus_poliza: policyData.estatus_poliza,
         p_agent_id: policyData.agent_id || null,
-        p_comision_agente: policyData.comision_agente || 0, // Passed from front
-        p_productos_detalle: policyData.productos_detalle || [], // New JSON Array
-        p_suma_asegurada_total: policyData.suma_asegurada_total || 0 // New Field
+        p_comision_agente: policyData.comision_agente || 0,
+        p_productos_detalle: policyData.productos_detalle || [],
+        p_suma_asegurada_total: policyData.suma_asegurada_total || 0
     }).single();
     if (error) throw error;
     return data as Policy;
@@ -294,8 +320,45 @@ export const deletePolicy = async (id: number) => {
     await logActivity('DELETE', 'POLICY', String(id));
 };
 
-// --- UPDATED PRODUCT FUNCTIONS ---
+// Storage
+export const uploadFile = async (bucket: string, path: string, file: File) => {
+    const { data, error } = await supabase.storage.from(bucket).upload(path, file, {
+        upsert: true
+    });
+    if (error) throw error;
+    return data;
+};
 
+export const getFiles = async (bucket: string, path: string): Promise<FileObject[]> => {
+    const { data, error } = await supabase.storage.from(bucket).list(path, {
+        limit: 100,
+        offset: 0,
+        sortBy: { column: 'name', order: 'asc' },
+    });
+    if (error) throw error;
+    return (data as FileObject[]) || [];
+};
+
+export const getPublicUrl = (bucket: string, path: string) => {
+    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+    return data.publicUrl;
+};
+
+export const downloadFile = async (bucket: string, path: string, fileName: string) => {
+    const { data, error } = await supabase.storage.from(bucket).download(path);
+    if (error) throw error;
+    const url = window.URL.createObjectURL(data);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+};
+
+
+// Products
 export const getProducts = async () => {
     const { data, error } = await supabase.rpc('get_products_for_user');
     if (error) throw error;
@@ -338,7 +401,7 @@ export const deleteProduct = async (id: number) => {
     if (error) throw error;
 };
 
-// ... (Tasks, Dashboard, Storage remain the same) ...
+// Tasks
 export const getTasks = async () => {
     const { data, error } = await supabase.rpc('get_tasks_for_user');
     if (error) throw error;
@@ -379,9 +442,11 @@ export const updateTask = async (id: number, updates: Omit<Task, 'id' | 'created
 export const deleteTask = async (id: number) => {
     const { error } = await supabase.rpc('delete_task_secure', { p_id: id });
     if (error) throw error;
+    // Log de auditoría
     await logActivity('DELETE', 'TASK', String(id));
 };
 
+// Dashboard
 export const getDashboardStats = async () => {
     const { data, error } = await supabase.rpc('get_dashboard_stats_for_user').single();
     if (error) throw error;
@@ -394,11 +459,13 @@ export const getLeadsByStatus = async () => {
     return data as Record<string, number>;
 };
 
+// Monthly Goals (New DB-backed logic)
 export const getMonthlyGoal = async (month: number, year: number): Promise<MonthlyGoal | null> => {
     const { data, error } = await supabase.rpc('get_monthly_goal', {
         p_month: month,
         p_year: year
     });
+    // It returns null if no row found, which is fine
     if (error) throw error;
     return data as MonthlyGoal | null;
 };
@@ -415,44 +482,10 @@ export const saveMonthlyGoal = async (goal: MonthlyGoal): Promise<MonthlyGoal> =
     return data as MonthlyGoal;
 };
 
+
+// Reports
 export const getExpiringPolicies = async (days: number) => {
     const { data, error } = await supabase.rpc('get_expiring_policies_for_user', { days_in_future: days });
     if (error) throw error;
     return data as unknown as Policy[];
 }
-
-export const uploadFile = async (bucket: string, path: string, file: File) => {
-    const { data, error } = await supabase.storage.from(bucket).upload(path, file, {
-        upsert: true
-    });
-    if (error) throw error;
-    return data;
-};
-
-export const getFiles = async (bucket: string, path: string): Promise<FileObject[]> => {
-    const { data, error } = await supabase.storage.from(bucket).list(path, {
-        limit: 100,
-        offset: 0,
-        sortBy: { column: 'name', order: 'asc' },
-    });
-    if (error) throw error;
-    return (data as FileObject[]) || [];
-};
-
-export const getPublicUrl = (bucket: string, path: string) => {
-    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-    return data.publicUrl;
-};
-
-export const downloadFile = async (bucket: string, path: string, fileName: string) => {
-    const { data, error } = await supabase.storage.from(bucket).download(path);
-    if (error) throw error;
-    const url = window.URL.createObjectURL(data);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', fileName);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-};

@@ -23,10 +23,9 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
         email: '',
         telefono: '',
         fuente: 'Web',
-        estatus_lead: 'NUEVO' as LeadStatus,
+        estatus_lead: 'PROSPECTO' as LeadStatus, // Default to new status
         notas: '',
         agent_id: user?.id || '',
-        // New fields
         fecha_nacimiento: '',
         ocupacion: '',
         ingresos_mensuales: 0 as string | number,
@@ -36,7 +35,6 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
     const [error, setError] = useState<string | null>(null);
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
-    // Archivos
     const [files, setFiles] = useState<FileObject[]>([]);
     const [isFilesLoading, setIsFilesLoading] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
@@ -48,13 +46,10 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
         setIsFilesLoading(true);
         setFileError(null);
         try {
-            // Requiere bucket 'lead_files' en Supabase
             const fileList = await getFiles('lead_files', String(lead.id));
             setFiles(fileList);
         } catch (err) {
             console.error('Error fetching files:', err);
-            // No mostramos error crítico si falla, solo en consola, para no bloquear el modal
-            // setFileError(`No se pudieron cargar los archivos.`); 
         } finally {
             setIsFilesLoading(false);
         }
@@ -81,7 +76,6 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
                 estatus_lead: lead.estatus_lead,
                 notas: lead.notas || '',
                 agent_id: lead.agent_id || (isAdmin ? '' : (user?.id || '')),
-                // Mapear nuevos campos
                 fecha_nacimiento: lead.fecha_nacimiento ? lead.fecha_nacimiento.split('T')[0] : '',
                 ocupacion: lead.ocupacion || '',
                 ingresos_mensuales: lead.ingresos_mensuales || 0,
@@ -130,7 +124,6 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
         setIsSaving(true);
         setError(null);
 
-        // Convert number explicitly
         const dataToSubmit = {
             ...formData,
             ingresos_mensuales: Number(formData.ingresos_mensuales)
@@ -182,7 +175,7 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label htmlFor="email" className="block text-sm font-medium text-text-secondary mb-1">Email</label>
-                                <input id="email" name="email" value={formData.email} onChange={handleChange} type="email" className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required />
+                                <input id="email" name="email" value={formData.email} onChange={handleChange} type="email" className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
                             </div>
                             <div>
                                 <label htmlFor="telefono" className="block text-sm font-medium text-text-secondary mb-1">Teléfono</label>
@@ -199,6 +192,7 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
                                     <option>Referido</option>
                                     <option>Llamada en frío</option>
                                     <option>Evento</option>
+                                    <option>Importado</option>
                                 </select>
                             </div>
                         </div>
@@ -223,6 +217,10 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
                             <label htmlFor="estatus_lead" className="block text-sm font-medium text-text-secondary mb-1">Estatus</label>
                             <select id="estatus_lead" name="estatus_lead" value={formData.estatus_lead} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary">
                                 {LEAD_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
+                                {/* Legacy support: Show current status if it's not in the new list so it doesn't disappear */}
+                                {lead && !LEAD_STATUSES.includes(lead.estatus_lead) && (
+                                    <option value={lead.estatus_lead}>{lead.estatus_lead} (Legacy)</option>
+                                )}
                             </select>
                         </div>
                         {isAdmin && (

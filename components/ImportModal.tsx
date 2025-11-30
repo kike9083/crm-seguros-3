@@ -55,8 +55,9 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose, onSuccess }) => {
                 });
 
                 // --- VALIDACIÓN Y NORMALIZACIÓN DE ESTATUS ---
+                // CAMBIO: El estatus por defecto ahora es 'PROSPECTO'
                 if (!lead.estatus_lead || !LEAD_STATUSES.includes(lead.estatus_lead as any)) {
-                    lead.estatus_lead = 'NUEVO'; 
+                    lead.estatus_lead = 'PROSPECTO'; 
                 }
 
                 if (!lead.fuente) lead.fuente = 'Importado';
@@ -103,8 +104,8 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose, onSuccess }) => {
 
     const downloadTemplate = () => {
         const headers = "Nombre,Email,Telefono,Fuente,Estatus,Notas";
-        // Actualizamos el ejemplo con un estatus válido para educar al usuario
-        const example = "Juan Pérez,juan@ejemplo.com,5512345678,Base de Datos,NUEVO,Interesado en Vida";
+        // Actualizamos el ejemplo con el nuevo estatus válido
+        const example = "Juan Pérez,juan@ejemplo.com,5512345678,Base de Datos,PROSPECTO,Interesado en Vida";
         const csvContent = "data:text/csv;charset=utf-8," + headers + "\n" + example;
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
@@ -125,7 +126,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose, onSuccess }) => {
                         <p className="mb-2">1. Descarga la plantilla para ver el formato correcto.</p>
                         <p className="mb-2 text-xs text-yellow-400">
                             Nota: Los estatus válidos son: {LEAD_STATUSES.join(', ')}. 
-                            Cualquier otro valor se guardará como 'NUEVO'.
+                            Cualquier otro valor se guardará como 'PROSPECTO'.
                         </p>
                         <button onClick={downloadTemplate} className="text-accent hover:underline font-bold">
                             Descargar Plantilla CSV

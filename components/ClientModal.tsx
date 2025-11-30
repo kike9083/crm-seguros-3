@@ -146,7 +146,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label htmlFor="email" className="block text-sm font-medium text-text-secondary mb-1">Email</label>
-                            <input id="email" name="email" value={formData.email} onChange={handleChange} type="email" className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required />
+                            <input id="email" name="email" value={formData.email} onChange={handleChange} type="email" className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
                         </div>
                         <div>
                             <label htmlFor="telefono" className="block text-sm font-medium text-text-secondary mb-1">Teléfono</label>
