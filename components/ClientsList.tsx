@@ -55,13 +55,14 @@ const ClientsList: React.FC = () => {
     // Lógica de filtrado avanzada
     const filteredClients = useMemo(() => {
         return clients.filter(client => {
-            // 1. Filtro de texto
+            // 1. Filtro de texto (Busca en ambos telefonos)
             const lowerTerm = searchTerm.toLowerCase();
             const agentName = client.agent_id ? agentMap.get(client.agent_id)?.toLowerCase() : '';
             const matchesSearch = !searchTerm || (
                 (client.nombre?.toLowerCase() || '').includes(lowerTerm) ||
                 (client.email?.toLowerCase() || '').includes(lowerTerm) ||
-                (client.telefono?.toLowerCase() || '').includes(lowerTerm) ||
+                (client.telefono1?.toLowerCase() || '').includes(lowerTerm) ||
+                (client.telefono2?.toLowerCase() || '').includes(lowerTerm) ||
                 (agentName && agentName.includes(lowerTerm))
             );
 
@@ -83,6 +84,7 @@ const ClientsList: React.FC = () => {
         });
     }, [clients, searchTerm, selectedAgentId, dateFrom, dateTo, agentMap]);
 
+    // ... (Modal handlers) ...
     const handleOpenModal = (client: Client) => {
         setSelectedClient(client);
         setIsModalOpen(true);
@@ -121,12 +123,12 @@ const ClientsList: React.FC = () => {
         setClientToDelete(null);
     };
 
-
     if (loading) return <div className="flex justify-center items-center h-full"><Spinner /></div>;
     if (error) return <p className="text-red-500 text-center">{error}</p>;
 
     return (
         <>
+            {/* ... (Filtros visuales) ... */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div className="flex flex-col gap-4 w-full md:w-auto flex-grow">
                     {/* Barra de búsqueda */}
@@ -158,32 +160,17 @@ const ClientsList: React.FC = () => {
                                 <option key={agent.id} value={agent.id}>{agent.nombre}</option>
                             ))}
                         </select>
-
+                        {/* ... Fechas ... */}
                         <div className="flex items-center gap-2 bg-secondary p-1 rounded border border-border">
                             <span className="text-xs text-text-secondary ml-2">Desde:</span>
-                            <input 
-                                type="date" 
-                                value={dateFrom} 
-                                onChange={(e) => setDateFrom(e.target.value)}
-                                className="bg-transparent text-sm p-1 focus:outline-none text-text-primary"
-                            />
+                            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="bg-transparent text-sm p-1 focus:outline-none text-text-primary"/>
                         </div>
                         <div className="flex items-center gap-2 bg-secondary p-1 rounded border border-border">
                             <span className="text-xs text-text-secondary ml-2">Hasta:</span>
-                            <input 
-                                type="date" 
-                                value={dateTo} 
-                                onChange={(e) => setDateTo(e.target.value)}
-                                className="bg-transparent text-sm p-1 focus:outline-none text-text-primary"
-                            />
+                            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="bg-transparent text-sm p-1 focus:outline-none text-text-primary"/>
                         </div>
                         {(selectedAgentId || dateFrom || dateTo) && (
-                            <button 
-                                onClick={() => { setSelectedAgentId(''); setDateFrom(''); setDateTo(''); }}
-                                className="text-xs text-red-400 hover:text-red-300 underline ml-2"
-                            >
-                                Limpiar filtros
-                            </button>
+                            <button onClick={() => { setSelectedAgentId(''); setDateFrom(''); setDateTo(''); }} className="text-xs text-red-400 hover:text-red-300 underline ml-2">Limpiar filtros</button>
                         )}
                     </div>
                 </div>
@@ -196,7 +183,7 @@ const ClientsList: React.FC = () => {
                             <tr>
                                 <th className="p-4">Nombre</th>
                                 <th className="p-4">Email</th>
-                                <th className="p-4">Teléfono</th>
+                                <th className="p-4">Teléfono 1</th>
                                 <th className="p-4">WhatsApp</th>
                                 <th className="p-4">Fecha de Alta</th>
                                 <th className="p-4">Agente</th>
@@ -205,20 +192,20 @@ const ClientsList: React.FC = () => {
                         </thead>
                         <tbody>
                             {filteredClients.map(client => {
-                                const rawPhone = client.telefono ? client.telefono.replace(/\D/g, '') : '';
+                                const rawPhone = client.telefono1 ? client.telefono1.replace(/\D/g, '') : '';
                                 
                                 return (
                                 <tr key={client.id} className="border-b border-border hover:bg-secondary">
                                     <td className="p-4 font-medium">{client.nombre}</td>
                                     <td className="p-4 text-text-secondary">{client.email}</td>
                                     <td className="p-4 text-text-secondary">
-                                        {client.telefono ? (
+                                        {client.telefono1 ? (
                                             <a 
-                                                href={`tel:${client.telefono}`} 
+                                                href={`tel:${client.telefono1}`} 
                                                 className="hover:text-white hover:underline transition-colors"
                                                 title="Llamar"
                                             >
-                                                {client.telefono}
+                                                {client.telefono1}
                                             </a>
                                         ) : ''}
                                     </td>
@@ -229,7 +216,7 @@ const ClientsList: React.FC = () => {
                                                 target="_blank" 
                                                 rel="noopener noreferrer"
                                                 className="text-green-500 hover:text-green-400 inline-block"
-                                                title={`Enviar WhatsApp a ${client.telefono}`}
+                                                title={`Enviar WhatsApp a ${client.telefono1}`}
                                             >
                                                 <WhatsAppIcon className="w-6 h-6" />
                                             </a>
@@ -258,7 +245,7 @@ const ClientsList: React.FC = () => {
                     )}
                 </div>
             </div>
-            {isModalOpen && selectedClient && (
+             {isModalOpen && selectedClient && (
                 <ClientModal
                     client={selectedClient}
                     onClose={handleCloseModal}

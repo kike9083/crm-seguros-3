@@ -68,12 +68,14 @@ const LeadsList: React.FC = () => {
             const matchesSearch = !searchTerm || (
                 (lead.nombre?.toLowerCase() || '').includes(lowerTerm) ||
                 (lead.email?.toLowerCase() || '').includes(lowerTerm) ||
-                (lead.telefono?.toLowerCase() || '').includes(lowerTerm) ||
+                (lead.telefono1?.toLowerCase() || '').includes(lowerTerm) ||
+                (lead.telefono2?.toLowerCase() || '').includes(lowerTerm) ||
                 (agentName && agentName.includes(lowerTerm)) ||
                 (lead.estatus_lead?.toLowerCase() || '').includes(lowerTerm)
             );
 
             // 2. Filtro por Agente
+            // Si selectedAgentId está vacío, mostramos todo. Si tiene valor, debe coincidir.
             const matchesAgent = !selectedAgentId || lead.agent_id === selectedAgentId;
 
             // 3. Filtro por Fecha de Creación
@@ -156,13 +158,16 @@ const LeadsList: React.FC = () => {
 
                     {/* Filtros avanzados */}
                     <div className="flex flex-wrap gap-2 items-center">
+                        {/* Selector de Agente (Visible para todos, útil para admins o ver compañeros si permitido) */}
                         <select
                             value={selectedAgentId}
                             onChange={(e) => setSelectedAgentId(e.target.value)}
                             className="bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary text-sm"
                         >
                             <option value="">Todos los Agentes</option>
-                            {profiles.filter(p => p.rol === 'AGENTE').map(agent => (
+                            {profiles
+                                .filter(p => p.rol === 'AGENTE' || p.rol === 'ADMIN') // Mostrar también admins si tienen leads
+                                .map(agent => (
                                 <option key={agent.id} value={agent.id}>{agent.nombre}</option>
                             ))}
                         </select>
@@ -197,6 +202,7 @@ const LeadsList: React.FC = () => {
                 </div>
 
                 <div className="flex space-x-2">
+                    {/* Botón importar visible para todos */}
                     <button
                         onClick={() => setIsImportModalOpen(true)}
                         className="flex items-center bg-secondary hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors whitespace-nowrap border border-border"
@@ -221,7 +227,7 @@ const LeadsList: React.FC = () => {
                             <tr>
                                 <th className="p-4">Nombre</th>
                                 <th className="p-4">Email</th>
-                                <th className="p-4">Teléfono</th>
+                                <th className="p-4">Teléfono 1</th> 
                                 <th className="p-4">WhatsApp</th>
                                 <th className="p-4">Fuente</th>
                                 <th className="p-4">Fecha Creación</th>
@@ -232,20 +238,20 @@ const LeadsList: React.FC = () => {
                         </thead>
                         <tbody>
                             {filteredLeads.map(lead => {
-                                const rawPhone = lead.telefono ? lead.telefono.replace(/\D/g, '') : '';
+                                const rawPhone = lead.telefono1 ? lead.telefono1.replace(/\D/g, '') : '';
                                 
                                 return (
                                 <tr key={lead.id} className="border-b border-border hover:bg-secondary">
                                     <td className="p-4 font-medium">{lead.nombre}</td>
                                     <td className="p-4 text-text-secondary">{lead.email}</td>
                                     <td className="p-4 text-text-secondary">
-                                        {lead.telefono ? (
+                                        {lead.telefono1 ? (
                                             <a 
-                                                href={`tel:${lead.telefono}`} 
+                                                href={`tel:${lead.telefono1}`} 
                                                 className="hover:text-white hover:underline transition-colors"
                                                 title="Llamar"
                                             >
-                                                {lead.telefono}
+                                                {lead.telefono1}
                                             </a>
                                         ) : ''}
                                     </td>
@@ -256,7 +262,7 @@ const LeadsList: React.FC = () => {
                                                 target="_blank" 
                                                 rel="noopener noreferrer"
                                                 className="text-green-500 hover:text-green-400 inline-block"
-                                                title={`Enviar WhatsApp a ${lead.telefono}`}
+                                                title={`Enviar WhatsApp a ${lead.telefono1}`}
                                             >
                                                 <WhatsAppIcon className="w-6 h-6" />
                                             </a>
@@ -298,7 +304,6 @@ const LeadsList: React.FC = () => {
                     onSave={handleSave}
                 />
             )}
-            {/* Modal de Importación */}
             {isImportModalOpen && (
                 <ImportModal
                     onClose={() => setIsImportModalOpen(false)}

@@ -16,11 +16,11 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
     const isAdmin = profile?.rol === 'ADMIN';
     const [agents, setAgents] = useState<Profile[]>([]);
 
-    // Use string | number for numeric fields to handle empty states better in inputs
     const [formData, setFormData] = useState({
         nombre: '',
         email: '',
-        telefono: '',
+        telefono1: '',
+        telefono2: '',
         fecha_nacimiento: '',
         agent_id: '',
         ocupacion: '',
@@ -66,7 +66,8 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
             setFormData({
                 nombre: client.nombre || '',
                 email: client.email || '',
-                telefono: client.telefono || '',
+                telefono1: client.telefono1 || '',
+                telefono2: client.telefono2 || '',
                 fecha_nacimiento: client.fecha_nacimiento ? client.fecha_nacimiento.split('T')[0] : '',
                 agent_id: client.agent_id || (isAdmin ? '' : (user?.id || '')),
                 ocupacion: client.ocupacion || '',
@@ -82,16 +83,15 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
+    // ... File handling functions (handleFileChange, handleButtonClick) ...
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file || !client) return;
-
         setIsUploading(true);
         setFileError(null);
         try {
             const sanitizedName = sanitizeFileName(file.name);
             const filePath = `${client.id}/${sanitizedName}`;
-            
             await uploadFile('client_files', filePath, file);
             await fetchFiles();
         } catch (err) {
@@ -99,9 +99,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
             setFileError(`Error al subir el archivo: ${getErrorMessage(err)}`);
         } finally {
             setIsUploading(false);
-            if (fileInputRef.current) {
-                fileInputRef.current.value = "";
-            }
+            if (fileInputRef.current) fileInputRef.current.value = "";
         }
     };
 
@@ -114,12 +112,8 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
         setIsSaving(true);
         setError(null);
         
-        // Prepare data. Convert empty strings to null implicitly via api.ts logic or explicitly undefined
         const dataToUpdate = {
             ...formData,
-            // Convert undefined/empty to null is handled in api.ts if we pass empty string. 
-            // We keep them as strings here to match the interface expectations (string | undefined)
-            // ingresos_mensuales needs to be a number
             ingresos_mensuales: Number(formData.ingresos_mensuales)
         };
 
@@ -149,13 +143,20 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
                             <input id="email" name="email" value={formData.email} onChange={handleChange} type="email" className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
                         </div>
                         <div>
-                            <label htmlFor="telefono" className="block text-sm font-medium text-text-secondary mb-1">Teléfono</label>
-                            <input id="telefono" name="telefono" value={formData.telefono} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
+                            <label htmlFor="telefono1" className="block text-sm font-medium text-text-secondary mb-1">Teléfono 1</label>
+                            <input id="telefono1" name="telefono1" value={formData.telefono1} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
                         </div>
                     </div>
-                    <div>
-                        <label htmlFor="fecha_nacimiento" className="block text-sm font-medium text-text-secondary mb-1">Fecha de Nacimiento</label>
-                        <input id="fecha_nacimiento" name="fecha_nacimiento" type="date" value={formData.fecha_nacimiento} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         <div>
+                            <label htmlFor="telefono2" className="block text-sm font-medium text-text-secondary mb-1">Teléfono 2 (Opcional)</label>
+                            <input id="telefono2" name="telefono2" value={formData.telefono2} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
+                        </div>
+                        <div>
+                            <label htmlFor="fecha_nacimiento" className="block text-sm font-medium text-text-secondary mb-1">Fecha de Nacimiento</label>
+                            <input id="fecha_nacimiento" name="fecha_nacimiento" type="date" value={formData.fecha_nacimiento} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
+                        </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

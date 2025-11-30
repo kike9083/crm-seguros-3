@@ -1,10 +1,10 @@
-export type LeadStatus = 'PROSPECTO' | 'V1' | 'V2' | 'V3' | 'NO INTERESADO' | 'GANADO' | 'NUEVO' | 'CONTACTADO' | 'CALIFICADO' | 'PERDIDO'; // Legacy types added for compatibility
+export type LeadStatus = 'PROSPECTO' | 'V1' | 'V2' | 'V3' | 'NO INTERESADO' | 'GANADO' | 'NUEVO' | 'CONTACTADO' | 'CALIFICADO' | 'PERDIDO'; 
 export type TaskStatus = 'PENDIENTE' | 'EN PROGRESO' | 'COMPLETADA';
 export type PolicyStatus = 'ACTIVA' | 'PENDIENTE PAGO' | 'CANCELADA' | 'VENCIDA';
 export type UserRole = 'ADMIN' | 'AGENTE';
 
 export interface Profile {
-    id: string; // uuid
+    id: string; 
     nombre: string;
     rol: UserRole;
 }
@@ -15,7 +15,9 @@ export interface Lead {
     updated_at?: string;
     nombre: string;
     email: string;
-    telefono: string;
+    // Reemplazo de telefono por telefono1 y telefono2
+    telefono1: string;
+    telefono2?: string;
     fuente: string;
     estatus_lead: LeadStatus;
     agent_id?: string;
@@ -33,7 +35,9 @@ export interface Client {
     updated_at?: string;
     nombre: string;
     email: string;
-    telefono: string;
+    // Reemplazo de telefono por telefono1 y telefono2
+    telefono1: string;
+    telefono2?: string;
     fecha_nacimiento?: string;
     lead_origen_id?: number;
     agent_id?: string;
@@ -43,7 +47,6 @@ export interface Client {
     polizas_externas?: string;
 }
 
-// Detalle de producto guardado dentro de la póliza (Snapshot)
 export interface ProductDetail {
     id: number;
     nombre: string;
@@ -60,9 +63,9 @@ export interface Policy {
     created_at: string;
     updated_at?: string;
     client_id: number;
-    product_id: number; // Legacy ID, refer to productos_detalle for multiple
+    product_id: number; 
     
-    prima_total: number; // Prima Mensual Total
+    prima_total: number; 
     suma_asegurada_total: number;
     
     fecha_emision: string;
@@ -72,7 +75,7 @@ export interface Policy {
     agent_id?: string;
     user_id?: string;
     
-    productos_detalle?: ProductDetail[]; // Nuevo campo JSONB
+    productos_detalle?: ProductDetail[]; 
 
     clients: { nombre: string; agent_id?: string } | { nombre: string; agent_id?: string }[] | null; 
     products: { nombre: string; categoria?: string } | { nombre: string; categoria?: string }[] | null;
@@ -85,8 +88,8 @@ export interface Product {
     nombre: string;
     aseguradora: string;
     comision_porcentaje: number;
-    prima_mensual: number; // Antes precio_base
-    suma_asegurada: number; // Nuevo campo
+    prima_mensual: number; 
+    suma_asegurada: number; 
     activo: boolean;
     categoria?: string; 
     descripcion?: string;
@@ -119,10 +122,10 @@ export interface FileObject {
 }
 
 export interface MonthlyGoal {
-    month: number; // 0-11
+    month: number; 
     year: number;
     vida: number;
-    ap: number; // Accidentes Personales
+    ap: number; 
     salud: number;
 }
 

@@ -48,14 +48,15 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose, onSuccess }) => {
                     const value = values[index];
                     if (header === 'nombre') lead.nombre = value;
                     if (header === 'email') lead.email = value;
-                    if (header === 'telefono') lead.telefono = value;
+                    // Mapeo de teléfonos
+                    if (header === 'telefono' || header === 'telefono1') lead.telefono1 = value;
+                    if (header === 'telefono2') lead.telefono2 = value;
                     if (header === 'fuente') lead.fuente = value;
                     if (header === 'estatus') lead.estatus_lead = value;
                     if (header === 'notas') lead.notas = value;
                 });
 
                 // --- VALIDACIÓN Y NORMALIZACIÓN DE ESTATUS ---
-                // CAMBIO: El estatus por defecto ahora es 'PROSPECTO'
                 if (!lead.estatus_lead || !LEAD_STATUSES.includes(lead.estatus_lead as any)) {
                     lead.estatus_lead = 'PROSPECTO'; 
                 }
@@ -63,8 +64,6 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose, onSuccess }) => {
                 if (!lead.fuente) lead.fuente = 'Importado';
                 
                 // Add system fields
-                // ASIGNAR PROPIETARIO: Es crucial para las políticas RLS.
-                // Si el agente importa, el user_id debe ser su ID.
                 lead.user_id = user?.id; 
                 lead.agent_id = user?.id;
 
@@ -103,14 +102,14 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose, onSuccess }) => {
     };
 
     const downloadTemplate = () => {
-        const headers = "Nombre,Email,Telefono,Fuente,Estatus,Notas";
-        // Actualizamos el ejemplo con el nuevo estatus válido
-        const example = "Juan Pérez,juan@ejemplo.com,5512345678,Base de Datos,PROSPECTO,Interesado en Vida";
+        // Actualizar cabecera de plantilla
+        const headers = "Nombre,Email,Telefono1,Telefono2,Fuente,Estatus,Notas";
+        const example = "Juan Pérez,juan@ejemplo.com,5512345678,5587654321,Base de Datos,PROSPECTO,Interesado en Vida";
         const csvContent = "data:text/csv;charset=utf-8," + headers + "\n" + example;
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "plantilla_leads.csv");
+        link.setAttribute("download", "plantilla_leads_v2.csv");
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -123,10 +122,9 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose, onSuccess }) => {
                 
                 <div className="space-y-6">
                     <div className="bg-secondary p-4 rounded text-sm text-text-secondary">
-                        <p className="mb-2">1. Descarga la plantilla para ver el formato correcto.</p>
+                        <p className="mb-2">1. Descarga la plantilla actualizada para ver el formato.</p>
                         <p className="mb-2 text-xs text-yellow-400">
-                            Nota: Los estatus válidos son: {LEAD_STATUSES.join(', ')}. 
-                            Cualquier otro valor se guardará como 'PROSPECTO'.
+                            Ahora soporta Telefono1 y Telefono2.
                         </p>
                         <button onClick={downloadTemplate} className="text-accent hover:underline font-bold">
                             Descargar Plantilla CSV

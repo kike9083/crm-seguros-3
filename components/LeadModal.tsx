@@ -21,9 +21,10 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
     const [formData, setFormData] = useState({
         nombre: '',
         email: '',
-        telefono: '',
+        telefono1: '',
+        telefono2: '',
         fuente: 'Web',
-        estatus_lead: 'PROSPECTO' as LeadStatus, // Default to new status
+        estatus_lead: 'PROSPECTO' as LeadStatus, 
         notas: '',
         agent_id: user?.id || '',
         fecha_nacimiento: '',
@@ -71,7 +72,8 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
             setFormData({
                 nombre: lead.nombre,
                 email: lead.email,
-                telefono: lead.telefono,
+                telefono1: lead.telefono1 || '',
+                telefono2: lead.telefono2 || '',
                 fuente: lead.fuente,
                 estatus_lead: lead.estatus_lead,
                 notas: lead.notas || '',
@@ -93,10 +95,10 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
+    // ... File handling functions (handleFileChange, handleButtonClick) remain the same ...
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file || !lead) return;
-
         setIsUploading(true);
         setFileError(null);
         try {
@@ -109,9 +111,7 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
             setFileError(`Error al subir el archivo: ${getErrorMessage(err)}`);
         } finally {
             setIsUploading(false);
-            if (fileInputRef.current) {
-                fileInputRef.current.value = "";
-            }
+            if (fileInputRef.current) fileInputRef.current.value = "";
         }
     };
 
@@ -178,14 +178,6 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
                                 <input id="email" name="email" value={formData.email} onChange={handleChange} type="email" className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
                             </div>
                             <div>
-                                <label htmlFor="telefono" className="block text-sm font-medium text-text-secondary mb-1">Teléfono</label>
-                                <input id="telefono" name="telefono" value={formData.telefono} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
-                            </div>
-                            <div>
-                                <label htmlFor="fecha_nacimiento" className="block text-sm font-medium text-text-secondary mb-1">Fecha de Nacimiento</label>
-                                <input id="fecha_nacimiento" name="fecha_nacimiento" type="date" value={formData.fecha_nacimiento} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
-                            </div>
-                            <div>
                                 <label htmlFor="fuente" className="block text-sm font-medium text-text-secondary mb-1">Fuente</label>
                                 <select id="fuente" name="fuente" value={formData.fuente} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary">
                                     <option>Web</option>
@@ -194,6 +186,18 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
                                     <option>Evento</option>
                                     <option>Importado</option>
                                 </select>
+                            </div>
+                        </div>
+
+                        {/* NUEVO: Dos campos de teléfono */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label htmlFor="telefono1" className="block text-sm font-medium text-text-secondary mb-1">Teléfono 1</label>
+                                <input id="telefono1" name="telefono1" value={formData.telefono1} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
+                            </div>
+                            <div>
+                                <label htmlFor="telefono2" className="block text-sm font-medium text-text-secondary mb-1">Teléfono 2 (Opcional)</label>
+                                <input id="telefono2" name="telefono2" value={formData.telefono2} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
                             </div>
                         </div>
 
@@ -207,6 +211,11 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
                                 <input id="ingresos_mensuales" name="ingresos_mensuales" type="number" value={formData.ingresos_mensuales} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
                             </div>
                         </div>
+
+                        <div>
+                            <label htmlFor="fecha_nacimiento" className="block text-sm font-medium text-text-secondary mb-1">Fecha de Nacimiento</label>
+                            <input id="fecha_nacimiento" name="fecha_nacimiento" type="date" value={formData.fecha_nacimiento} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
+                        </div>
                         
                         <div>
                             <label htmlFor="polizas_externas" className="block text-sm font-medium text-text-secondary mb-1">Pólizas Externas</label>
@@ -217,7 +226,6 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
                             <label htmlFor="estatus_lead" className="block text-sm font-medium text-text-secondary mb-1">Estatus</label>
                             <select id="estatus_lead" name="estatus_lead" value={formData.estatus_lead} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary">
                                 {LEAD_STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
-                                {/* Legacy support: Show current status if it's not in the new list so it doesn't disappear */}
                                 {lead && !LEAD_STATUSES.includes(lead.estatus_lead) && (
                                     <option value={lead.estatus_lead}>{lead.estatus_lead} (Legacy)</option>
                                 )}
@@ -245,7 +253,7 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
                             <textarea id="notas" name="notas" value={formData.notas} onChange={handleChange} rows={3} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary"></textarea>
                         </div>
 
-                        {/* Sección de Archivos */}
+                        {/* Sección de Archivos (misma lógica) */}
                         {lead && (
                             <div className="mt-4 border-t border-border pt-4">
                                 <h3 className="text-lg font-medium text-text-primary mb-3 flex items-center">
