@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getPolicies, deletePolicy, getErrorMessage, getAllProfiles } from '../services/api';
 import { Policy, Profile } from '../types';
 import Spinner from './Spinner';
@@ -17,6 +17,12 @@ const PoliciesList: React.FC = () => {
     const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [policyToDelete, setPolicyToDelete] = useState<Policy | null>(null);
+
+    // Estados para filtros
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedAgentId, setSelectedAgentId] = useState('');
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
 
     const agentMap = React.useMemo(() => {
         const map = new Map<string, string>();
@@ -45,6 +51,61 @@ const PoliciesList: React.FC = () => {
     useEffect(() => {
         fetchPoliciesAndProfiles();
     }, [fetchPoliciesAndProfiles]);
+
+    // Helper para obtener nombres
+    const getRelatedName = useCallback((relation: any): string => {
+        if (!relation) return 'N/A';
+        if (Array.isArray(relation)) {
+            return relation.length > 0 && relation[0].nombre ? relation[0].nombre : 'N/A';
+        }
+        if (typeof relation === 'object' && relation !== null && relation.nombre) {
+            return relation.nombre;
+        }
+        return 'N/A';
+    }, []);
+
+    // Helper para obtener string de productos para búsqueda
+    const getProductsString = useCallback((policy: Policy): string => {
+        if (policy.productos_detalle && Array.isArray(policy.productos_detalle) && policy.productos_detalle.length > 0) {
+            return policy.productos_detalle.map(p => p.nombre).join(' ');
+        }
+        return getRelatedName(policy.products);
+    }, [getRelatedName]);
+
+    // Lógica de filtrado
+    const filteredPolicies = useMemo(() => {
+        return policies.filter(policy => {
+            // 1. Filtro de texto
+            const lowerTerm = searchTerm.toLowerCase();
+            const clientName = getRelatedName(policy.clients).toLowerCase();
+            const productsName = getProductsString(policy).toLowerCase();
+            const agentName = policy.agent_id ? agentMap.get(policy.agent_id)?.toLowerCase() : '';
+            const status = policy.estatus_poliza.toLowerCase();
+
+            const matchesSearch = !searchTerm || (
+                clientName.includes(lowerTerm) ||
+                productsName.includes(lowerTerm) ||
+                (agentName && agentName.includes(lowerTerm)) ||
+                status.includes(lowerTerm)
+            );
+
+            // 2. Filtro por Agente
+            const matchesAgent = !selectedAgentId || policy.agent_id === selectedAgentId;
+
+            // 3. Filtro por Fecha de Emisión
+            let matchesDate = true;
+            if (dateFrom || dateTo) {
+                const policyDate = new Date(policy.fecha_emision).setHours(0,0,0,0);
+                const from = dateFrom ? new Date(dateFrom).setHours(0,0,0,0) : null;
+                const to = dateTo ? new Date(dateTo).setHours(0,0,0,0) : null;
+
+                if (from && policyDate < from) matchesDate = false;
+                if (to && policyDate > to) matchesDate = false;
+            }
+
+            return matchesSearch && matchesAgent && matchesDate;
+        });
+    }, [policies, searchTerm, selectedAgentId, dateFrom, dateTo, agentMap, getRelatedName, getProductsString]);
     
     const handleOpenModal = (policy: Policy | null) => {
         setSelectedPolicy(policy);
@@ -94,29 +155,7 @@ const PoliciesList: React.FC = () => {
         }
     };
 
-    // Helper ultra-robusto para obtener nombres de relaciones
-    const getRelatedName = (relation: any): string => {
-        if (!relation) return 'N/A';
-        
-        // Caso 1: Es un array (Supabase devuelve esto en joins 1:N o N:N a veces)
-        if (Array.isArray(relation)) {
-            if (relation.length > 0 && relation[0].nombre) {
-                return relation[0].nombre;
-            }
-            return 'N/A';
-        }
-        
-        // Caso 2: Es un objeto directo
-        if (typeof relation === 'object' && relation !== null) {
-            if (relation.nombre) return relation.nombre;
-        }
-        
-        return 'N/A';
-    };
-
-    // Helper específico para mostrar los productos de la póliza
     const getProductDisplay = (policy: Policy) => {
-        // 1. Prioridad: Mostrar desde 'productos_detalle' (nuevo formato multi-producto)
         if (policy.productos_detalle && Array.isArray(policy.productos_detalle) && policy.productos_detalle.length > 0) {
             return (
                 <div className="flex flex-col space-y-1">
@@ -128,7 +167,6 @@ const PoliciesList: React.FC = () => {
                 </div>
             );
         }
-        // 2. Fallback: Mostrar desde relación 'products' (legacy)
         return <span className="text-text-secondary">{getRelatedName(policy.products)}</span>;
     };
     
@@ -137,62 +175,142 @@ const PoliciesList: React.FC = () => {
 
     return (
         <>
-            <div className="flex justify-end mb-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                <div className="flex flex-col gap-4 w-full md:w-auto flex-grow">
+                    {/* Barra de búsqueda */}
+                    <div className="relative w-full md:max-w-md">
+                        <input
+                            type="text"
+                            placeholder="Buscar por cliente, producto, estatus..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full bg-secondary p-2 pl-10 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary text-text-primary placeholder-text-secondary"
+                            aria-label="Buscar pólizas"
+                        />
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 text-text-secondary">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+                            </svg>
+                        </div>
+                    </div>
+
+                    {/* Filtros */}
+                    <div className="flex flex-wrap gap-2 items-center">
+                        <select
+                            value={selectedAgentId}
+                            onChange={(e) => setSelectedAgentId(e.target.value)}
+                            className="bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                        >
+                            <option value="">Todos los Agentes</option>
+                            {profiles.filter(p => p.rol === 'AGENTE').map(agent => (
+                                <option key={agent.id} value={agent.id}>{agent.nombre}</option>
+                            ))}
+                        </select>
+
+                        <div className="flex items-center gap-2 bg-secondary p-1 rounded border border-border">
+                            <span className="text-xs text-text-secondary ml-2">Emisión Desde:</span>
+                            <input 
+                                type="date" 
+                                value={dateFrom} 
+                                onChange={(e) => setDateFrom(e.target.value)}
+                                className="bg-transparent text-sm p-1 focus:outline-none text-text-primary"
+                            />
+                        </div>
+                        <div className="flex items-center gap-2 bg-secondary p-1 rounded border border-border">
+                            <span className="text-xs text-text-secondary ml-2">Hasta:</span>
+                            <input 
+                                type="date" 
+                                value={dateTo} 
+                                onChange={(e) => setDateTo(e.target.value)}
+                                className="bg-transparent text-sm p-1 focus:outline-none text-text-primary"
+                            />
+                        </div>
+                        {(selectedAgentId || dateFrom || dateTo) && (
+                            <button 
+                                onClick={() => { setSelectedAgentId(''); setDateFrom(''); setDateTo(''); }}
+                                className="text-xs text-red-400 hover:text-red-300 underline ml-2"
+                            >
+                                Limpiar filtros
+                            </button>
+                        )}
+                    </div>
+                </div>
+
                 <button
                     onClick={() => handleOpenModal(null)}
-                    className="flex items-center bg-primary hover:bg-accent text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                    className="flex items-center bg-primary hover:bg-accent text-white font-bold py-2 px-4 rounded-lg transition-colors whitespace-nowrap"
                 >
                     <PlusIcon className="w-5 h-5 mr-2"/>
                     Crear Nueva Póliza
                 </button>
             </div>
+
             <div className="bg-card p-6 rounded-lg shadow-lg">
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left">
+                    <table className="w-full text-left text-sm">
                         <thead className="border-b border-border">
                             <tr>
-                                <th className="p-4">Cliente</th>
-                                <th className="p-4">Producto(s)</th>
-                                <th className="p-4">Prima Total</th>
-                                <th className="p-4">Comisión Agente</th>
-                                <th className="p-4">Agente</th>
-                                <th className="p-4">Fecha Vencimiento</th>
-                                <th className="p-4">Estatus</th>
-                                <th className="p-4">Acciones</th>
+                                <th className="p-3">Cliente</th>
+                                <th className="p-3">Producto(s)</th>
+                                <th className="p-3 text-right">Prima Mensual</th>
+                                <th className="p-3 text-right">Prima Anual</th>
+                                <th className="p-3 text-right">Comisión Mensual</th>
+                                <th className="p-3 text-right">Comisión Anual</th>
+                                <th className="p-3">Agente</th>
+                                <th className="p-3">Vencimiento</th>
+                                <th className="p-3">Estatus</th>
+                                <th className="p-3">Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {policies.map(policy => (
+                            {filteredPolicies.map(policy => {
+                                const monthlyPremium = Number(policy.prima_total);
+                                const annualPremium = monthlyPremium * 12;
+                                const monthlyCommission = Number(policy.comision_agente);
+                                const annualCommission = monthlyCommission * 12;
+
+                                return (
                                 <tr key={policy.id} className="border-b border-border hover:bg-secondary">
-                                    <td className="p-4 font-medium">{getRelatedName(policy.clients)}</td>
-                                    <td className="p-4">
+                                    <td className="p-3 font-medium">{getRelatedName(policy.clients)}</td>
+                                    <td className="p-3">
                                         {getProductDisplay(policy)}
                                     </td>
-                                    <td className="p-4 text-text-secondary font-mono">
-                                        ${Number(policy.prima_total).toLocaleString()}
+                                    <td className="p-3 text-right font-mono text-text-secondary">
+                                        ${monthlyPremium.toLocaleString()}
                                     </td>
-                                    <td className="p-4 text-text-secondary font-mono text-green-400">
-                                        ${Number(policy.comision_agente).toLocaleString()}
+                                    <td className="p-3 text-right font-mono text-blue-300">
+                                        ${annualPremium.toLocaleString()}
                                     </td>
-                                    <td className="p-4 text-blue-300">{policy.agent_id ? agentMap.get(policy.agent_id) : 'N/A'}</td>
-                                    <td className="p-4 text-text-secondary text-sm">{new Date(policy.fecha_vencimiento).toLocaleDateString()}</td>
-                                    <td className="p-4">
+                                    <td className="p-3 text-right font-mono text-green-400">
+                                        ${monthlyCommission.toLocaleString()}
+                                    </td>
+                                    <td className="p-3 text-right font-mono text-green-300 font-bold">
+                                        ${annualCommission.toLocaleString()}
+                                    </td>
+                                    <td className="p-3 text-blue-300">{policy.agent_id ? agentMap.get(policy.agent_id) : 'N/A'}</td>
+                                    <td className="p-3 text-text-secondary text-xs">{new Date(policy.fecha_vencimiento).toLocaleDateString()}</td>
+                                    <td className="p-3">
                                         <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(policy.estatus_poliza)}`}>
                                             {policy.estatus_poliza}
                                         </span>
                                     </td>
-                                    <td className="p-4 space-x-2 whitespace-nowrap">
+                                    <td className="p-3 space-x-2 whitespace-nowrap">
                                         <button onClick={() => handleOpenModal(policy)} className="text-accent hover:underline">Editar</button>
                                         {profile?.rol === 'ADMIN' && (
                                             <button onClick={() => handleDeleteRequest(policy)} className="text-red-500 hover:underline">Eliminar</button>
                                         )}
                                     </td>
                                 </tr>
-                            ))}
+                                );
+                            })}
                         </tbody>
                     </table>
-                    {policies.length === 0 && (
-                        <p className="text-center p-8 text-text-secondary">No se encontraron pólizas.</p>
+                    {filteredPolicies.length === 0 && (
+                        <p className="text-center p-8 text-text-secondary">
+                            {searchTerm || selectedAgentId || dateFrom || dateTo
+                                ? `No se encontraron pólizas con los filtros seleccionados.` 
+                                : 'No se encontraron pólizas.'}
+                        </p>
                     )}
                 </div>
             </div>
