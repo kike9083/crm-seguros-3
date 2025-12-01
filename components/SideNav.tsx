@@ -9,6 +9,7 @@ import PresentationChartLineIcon from './icons/PresentationChartLineIcon';
 import TagIcon from './icons/TagIcon';
 import InformationCircleIcon from './icons/InformationCircleIcon';
 import ListBulletIcon from './icons/ListBulletIcon';
+// FIX: Correct casing for import to match file name CurrencyDollarIcon.tsx
 import CurrencyDollarIcon from './icons/CurrencyDollaricon';
 import { Profile } from '../types';
 

@@ -264,9 +264,21 @@ const PoliciesList: React.FC = () => {
                         </thead>
                         <tbody>
                             {filteredPolicies.map(policy => {
+                                // Prima Total (ahora guarda el valor mensual)
                                 const monthlyPremium = Number(policy.prima_total);
                                 const annualPremium = monthlyPremium * 12;
-                                const monthlyCommission = Number(policy.comision_agente);
+
+                                // CORRECCIÓN CRÍTICA: Calcular comisión mensual sumando el detalle REAL
+                                // Ignoramos el campo 'comision_agente' de la tabla principal si la DB lo está corrompiendo.
+                                let monthlyCommission = 0;
+                                
+                                if (policy.productos_detalle && Array.isArray(policy.productos_detalle) && policy.productos_detalle.length > 0) {
+                                    monthlyCommission = policy.productos_detalle.reduce((sum, p) => sum + Number(p.comision_generada || 0), 0);
+                                } else {
+                                    // Fallback a valor almacenado para pólizas legacy
+                                    monthlyCommission = Number(policy.comision_agente);
+                                }
+                                
                                 const annualCommission = monthlyCommission * 12;
 
                                 return (

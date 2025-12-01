@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPolicy, updatePolicy, getClients, getProducts, getFiles, uploadFile, getPublicUrl, getErrorMessage, getAllProfiles, sanitizeFileName, downloadFile } from '../services/api';
 import { Client, Product, Policy, PolicyStatus, FileObject, Profile, ProductDetail } from '../types';
@@ -24,9 +25,11 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
         agent_id: user?.id || ''
     });
 
+    // Estado para gestión de productos
     const [selectedProducts, setSelectedProducts] = useState<ProductDetail[]>([]);
     const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
     
+    // Estado temporal para agregar un nuevo producto
     const [newProduct, setNewProduct] = useState({
         id: '',
         prima_mensual: '' as string | number,
@@ -83,10 +86,12 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
                 agent_id: policy.agent_id || (isAdmin ? '' : (user?.id || ''))
             });
 
+            // LÓGICA DE RECUPERACIÓN DE PRODUCTOS
             if (policy.productos_detalle && Array.isArray(policy.productos_detalle) && policy.productos_detalle.length > 0) {
                 setSelectedProducts(policy.productos_detalle);
             } 
             else if (policy.product_id) {
+                // Fallback para pólizas antiguas (Legacy)
                 const legacyProduct = Array.isArray(policy.products) ? policy.products[0] : policy.products;
                 
                 if (legacyProduct) {
@@ -98,6 +103,7 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
                         prima_mensual: Number(policy.prima_total) || 0, 
                         suma_asegurada: Number(policy.suma_asegurada_total) || 0,
                         comision_porcentaje: 0, 
+                        // Asumimos que la comisión guardada en la póliza corresponde a este único producto
                         comision_generada: Number(policy.comision_agente) || 0
                     };
                     setSelectedProducts([recoveredProduct]);
@@ -156,6 +162,8 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
         if (prodBase) {
             const prima = parseFloat(String(newProduct.prima_mensual));
             const suma = parseFloat(String(newProduct.suma_asegurada));
+            // CÁLCULO INDIVIDUAL POR PRODUCTO: (Prima Mensual * % del producto)
+            const comisionMensualProd = prima * (prodBase.comision_porcentaje / 100);
             
             const newDetail: ProductDetail = {
                 id: prodBase.id,
@@ -165,7 +173,7 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
                 prima_mensual: prima,
                 suma_asegurada: suma,
                 comision_porcentaje: prodBase.comision_porcentaje,
-                comision_generada: (prima * (prodBase.comision_porcentaje / 100)) 
+                comision_generada: comisionMensualProd 
             };
             setSelectedProducts([...selectedProducts, newDetail]);
             
@@ -179,9 +187,17 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
         setSelectedProducts(newProducts);
     };
 
+    // TOTALES
     const totalPrimaMensual = selectedProducts.reduce((sum, p) => sum + Number(p.prima_mensual), 0);
     const totalSumaAsegurada = selectedProducts.reduce((sum, p) => sum + Number(p.suma_asegurada), 0);
-    const totalComisionEstimada = selectedProducts.reduce((sum, p) => sum + ((p.prima_mensual * (p.comision_porcentaje || 0)) / 100), 0); // Mensual
+    
+    // Cálculo de Comisión Mensual Estimada (Suma de comisiones individuales)
+    const totalComisionEstimada = selectedProducts.reduce((sum, p) => {
+        // Usamos la comision_generada que ya calculamos individualmente, o recalculamos para seguridad
+        const prima = Number(p.prima_mensual);
+        const porcentaje = Number(p.comision_porcentaje);
+        return sum + (prima * (porcentaje / 100));
+    }, 0);
 
     // Valores Anuales para visualización
     const totalPrimaAnual = totalPrimaMensual * 12;
@@ -227,8 +243,14 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
             
             prima_total: totalPrimaMensual, 
             suma_asegurada_total: totalSumaAsegurada,
-            productos_detalle: selectedProducts,
-            comision_agente: totalComisionEstimada, 
+            // Actualizamos el detalle
+            productos_detalle: selectedProducts.map(p => ({
+                ...p,
+                // Aseguramos que la comisión generada guardada en el JSON también sea correcta
+                comision_generada: Number(p.prima_mensual) * (Number(p.comision_porcentaje) / 100)
+            })),
+            // Guardamos la comisión mensual total EXACTA calculada aquí
+            comision_agente: Number(totalComisionEstimada.toFixed(2)), 
 
             fecha_emision: formData.fecha_emision,
             fecha_vencimiento: formData.fecha_vencimiento,
@@ -348,7 +370,7 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
                                         <td className="py-2 text-green-400">${totalPrimaMensual.toLocaleString()}</td>
                                         <td></td>
                                     </tr>
-                                    {/* TOTALES ANUALES (NUEVO) */}
+                                    {/* TOTALES ANUALES */}
                                     <tr className="font-bold text-blue-300 bg-white bg-opacity-5">
                                         <td className="py-2 pl-2">TOTALES (Anual)</td>
                                         <td className="py-2">-</td>
@@ -366,7 +388,6 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
                         </div>
                     </div>
 
-                    {/* Resto del formulario (Fechas, Agente, Archivos, Botones) permanece igual */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                          <div>
                             <label htmlFor="fecha_emision" className="block text-sm font-medium text-text-secondary mb-1">Fecha de Emisión</label>
@@ -398,6 +419,7 @@ const PolicyModal: React.FC<PolicyModalProps> = ({ policy, onClose, onSave }) =>
 
                     {error && <p className="text-red-500 mt-4 text-sm">{error}</p>}
 
+                    {/* ARCHIVOS (Se mantiene igual) */}
                     {policy && (
                          <div className="mt-6 border-t border-border pt-4">
                             <h3 className="text-lg font-medium text-text-primary mb-3 flex items-center">

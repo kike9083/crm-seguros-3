@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { getLeads, updateLead, promoteLeadToClient, getErrorMessage, getAllProfiles } from '../services/api';
 import { Lead, LeadStatus, Profile } from '../types';
@@ -22,7 +23,7 @@ const LeadCard: React.FC<{
     >
         <h3 className="font-bold text-text-primary">{lead.nombre}</h3>
         <p className="text-sm text-text-secondary">{lead.email}</p>
-        <p className="text-sm text-text-secondary mt-1">{lead.telefono}</p>
+        <p className="text-sm text-text-secondary mt-1">{lead.telefono1}</p>
         <div className="mt-2 text-xs text-text-secondary">Fuente: {lead.fuente}</div>
         {agentName && <div className="mt-2 text-xs text-blue-300">Agente: {agentName}</div>}
     </div>

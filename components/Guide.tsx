@@ -143,7 +143,7 @@ const Guide: React.FC = () => {
                     <strong>Captura:</strong> Usa la Importación Masiva para cargar tu base o crea leads manualmente. Clasifícalos como "PROSPECTO".
                 </li>
                 <li>
-                    <strong>Seguimiento:</strong> Avanza el lead por las etapas V1 -> V2 -> V3 usando Tareas para agendar citas y llamadas.
+                    <strong>Seguimiento:</strong> Avanza el lead por las etapas V1 - V2 - V3 usando Tareas para agendar citas y llamadas.
                 </li>
                 <li>
                     <strong>Cierre:</strong> Al llegar a "GANADO", el sistema crea al Cliente. Ve a la sección de Pólizas y crea el contrato.

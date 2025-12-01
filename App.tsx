@@ -16,6 +16,7 @@ import Guide from './components/Guide';
 import LeadsList from './components/LeadsList';
 import CommissionsList from './components/CommissionsList';
 
+// Ensure all View types are handled in the switch statement
 type View = 'dashboard' | 'pipeline' | 'leads-list' | 'clients' | 'tasks' | 'policies' | 'products' | 'settings' | 'reports' | 'guide' | 'commissions';
 
 interface MainAppProps {
