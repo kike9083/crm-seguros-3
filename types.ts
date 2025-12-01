@@ -15,7 +15,6 @@ export interface Lead {
     updated_at?: string;
     nombre: string;
     email: string;
-    // Reemplazo de telefono por telefono1 y telefono2
     telefono1: string;
     telefono2?: string;
     fuente: string;
@@ -27,6 +26,9 @@ export interface Lead {
     ocupacion?: string;
     ingresos_mensuales?: number;
     polizas_externas?: string;
+    // Nuevos campos
+    cedula?: string;
+    empresa?: string;
 }
 
 export interface Client {
@@ -35,7 +37,6 @@ export interface Client {
     updated_at?: string;
     nombre: string;
     email: string;
-    // Reemplazo de telefono por telefono1 y telefono2
     telefono1: string;
     telefono2?: string;
     fecha_nacimiento?: string;
@@ -45,6 +46,9 @@ export interface Client {
     ocupacion?: string;
     ingresos_mensuales?: number;
     polizas_externas?: string;
+    // Nuevos campos
+    cedula?: string;
+    empresa?: string;
 }
 
 export interface ProductDetail {
