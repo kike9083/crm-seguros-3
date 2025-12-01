@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { bulkCreateLeads, getErrorMessage } from '../services/api';
 import Spinner from './Spinner';
 import { useAuth } from './auth/AuthContext';
-import { LEAD_STATUSES } from '../constants'; // Importar valores válidos
+import { LEAD_STATUSES } from '../constants';
 
 interface ImportModalProps {
     onClose: () => void;
@@ -47,8 +47,9 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose, onSuccess }) => {
                 headers.forEach((header, index) => {
                     const value = values[index];
                     if (header === 'nombre') lead.nombre = value;
+                    if (header === 'cedula') lead.cedula = value; // New
+                    if (header === 'empresa') lead.empresa = value; // New
                     if (header === 'email') lead.email = value;
-                    // Mapeo de teléfonos
                     if (header === 'telefono' || header === 'telefono1') lead.telefono1 = value;
                     if (header === 'telefono2') lead.telefono2 = value;
                     if (header === 'fuente') lead.fuente = value;
@@ -56,22 +57,19 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose, onSuccess }) => {
                     if (header === 'notas') lead.notas = value;
                 });
 
-                // --- VALIDACIÓN Y NORMALIZACIÓN DE ESTATUS ---
                 if (!lead.estatus_lead || !LEAD_STATUSES.includes(lead.estatus_lead as any)) {
                     lead.estatus_lead = 'PROSPECTO'; 
                 }
 
                 if (!lead.fuente) lead.fuente = 'Importado';
                 
-                // Add system fields
                 lead.user_id = user?.id; 
                 lead.agent_id = user?.id;
 
                 return lead;
             });
 
-            // Filter out empty rows/objects that might have been created
-            const validLeads = leads.filter(l => l.nombre); // Nombre is required
+            const validLeads = leads.filter(l => l.nombre);
 
             setParsedData(validLeads);
             setPreviewCount(validLeads.length);
@@ -103,13 +101,13 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose, onSuccess }) => {
 
     const downloadTemplate = () => {
         // Actualizar cabecera de plantilla
-        const headers = "Nombre,Email,Telefono1,Telefono2,Fuente,Estatus,Notas";
-        const example = "Juan Pérez,juan@ejemplo.com,5512345678,5587654321,Base de Datos,PROSPECTO,Interesado en Vida";
+        const headers = "Nombre,Cedula,Empresa,Email,Telefono1,Telefono2,Fuente,Estatus,Notas";
+        const example = "Juan Pérez,8-123-456,Mi Empresa SA,juan@ejemplo.com,5512345678,5587654321,Base de Datos,PROSPECTO,Interesado en Vida";
         const csvContent = "data:text/csv;charset=utf-8," + headers + "\n" + example;
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", "plantilla_leads_v2.csv");
+        link.setAttribute("download", "plantilla_leads_v3.csv");
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -124,7 +122,7 @@ const ImportModal: React.FC<ImportModalProps> = ({ onClose, onSuccess }) => {
                     <div className="bg-secondary p-4 rounded text-sm text-text-secondary">
                         <p className="mb-2">1. Descarga la plantilla actualizada para ver el formato.</p>
                         <p className="mb-2 text-xs text-yellow-400">
-                            Ahora soporta Telefono1 y Telefono2.
+                            Incluye columnas: Cédula y Empresa.
                         </p>
                         <button onClick={downloadTemplate} className="text-accent hover:underline font-bold">
                             Descargar Plantilla CSV

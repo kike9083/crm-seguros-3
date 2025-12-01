@@ -20,6 +20,8 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
 
     const [formData, setFormData] = useState({
         nombre: '',
+        cedula: '',
+        empresa: '',
         email: '',
         telefono1: '',
         telefono2: '',
@@ -71,6 +73,8 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
         if (lead) {
             setFormData({
                 nombre: lead.nombre,
+                cedula: lead.cedula || '',
+                empresa: lead.empresa || '',
                 email: lead.email,
                 telefono1: lead.telefono1 || '',
                 telefono2: lead.telefono2 || '',
@@ -95,7 +99,7 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    // ... File handling functions (handleFileChange, handleButtonClick) remain the same ...
+    // ... (File functions same) ...
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file || !lead) return;
@@ -172,12 +176,22 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
                             <label htmlFor="nombre" className="block text-sm font-medium text-text-secondary mb-1">Nombre Completo</label>
                             <input id="nombre" name="nombre" value={formData.nombre} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required />
                         </div>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label htmlFor="cedula" className="block text-sm font-medium text-text-secondary mb-1">Cédula / ID</label>
+                                <input id="cedula" name="cedula" value={formData.cedula} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
+                            </div>
+                            <div>
+                                <label htmlFor="empresa" className="block text-sm font-medium text-text-secondary mb-1">Empresa</label>
+                                <input id="empresa" name="empresa" value={formData.empresa} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
+                            </div>
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label htmlFor="email" className="block text-sm font-medium text-text-secondary mb-1">Email</label>
                                 <input id="email" name="email" value={formData.email} onChange={handleChange} type="email" className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
                             </div>
-                            <div>
+                             <div>
                                 <label htmlFor="fuente" className="block text-sm font-medium text-text-secondary mb-1">Fuente</label>
                                 <select id="fuente" name="fuente" value={formData.fuente} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary">
                                     <option>Web</option>
@@ -189,7 +203,6 @@ const LeadModal: React.FC<LeadModalProps> = ({ lead, onClose, onSave }) => {
                             </div>
                         </div>
 
-                        {/* NUEVO: Dos campos de teléfono */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label htmlFor="telefono1" className="block text-sm font-medium text-text-secondary mb-1">Teléfono 1</label>

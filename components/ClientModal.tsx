@@ -18,6 +18,8 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
 
     const [formData, setFormData] = useState({
         nombre: '',
+        cedula: '',
+        empresa: '',
         email: '',
         telefono1: '',
         telefono2: '',
@@ -65,6 +67,8 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
         if (client) {
             setFormData({
                 nombre: client.nombre || '',
+                cedula: client.cedula || '',
+                empresa: client.empresa || '',
                 email: client.email || '',
                 telefono1: client.telefono1 || '',
                 telefono2: client.telefono2 || '',
@@ -83,7 +87,7 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    // ... File handling functions (handleFileChange, handleButtonClick) ...
+    // ... (File functions same) ...
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file || !client) return;
@@ -137,6 +141,18 @@ const ClientModal: React.FC<ClientModalProps> = ({ client, onClose, onSave }) =>
                         <label htmlFor="nombre" className="block text-sm font-medium text-text-secondary mb-1">Nombre Completo</label>
                         <input id="nombre" name="nombre" value={formData.nombre} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" required />
                     </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label htmlFor="cedula" className="block text-sm font-medium text-text-secondary mb-1">Cédula / ID</label>
+                            <input id="cedula" name="cedula" value={formData.cedula} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
+                        </div>
+                        <div>
+                            <label htmlFor="empresa" className="block text-sm font-medium text-text-secondary mb-1">Empresa</label>
+                            <input id="empresa" name="empresa" value={formData.empresa} onChange={handleChange} className="w-full bg-secondary p-2 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary" />
+                        </div>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label htmlFor="email" className="block text-sm font-medium text-text-secondary mb-1">Email</label>

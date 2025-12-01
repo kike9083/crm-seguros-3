@@ -55,21 +55,21 @@ const ClientsList: React.FC = () => {
     // Lógica de filtrado avanzada
     const filteredClients = useMemo(() => {
         return clients.filter(client => {
-            // 1. Filtro de texto (Busca en ambos telefonos)
+            // 1. Filtro de texto
             const lowerTerm = searchTerm.toLowerCase();
             const agentName = client.agent_id ? agentMap.get(client.agent_id)?.toLowerCase() : '';
             const matchesSearch = !searchTerm || (
                 (client.nombre?.toLowerCase() || '').includes(lowerTerm) ||
                 (client.email?.toLowerCase() || '').includes(lowerTerm) ||
+                (client.cedula?.toLowerCase() || '').includes(lowerTerm) ||
+                (client.empresa?.toLowerCase() || '').includes(lowerTerm) ||
                 (client.telefono1?.toLowerCase() || '').includes(lowerTerm) ||
                 (client.telefono2?.toLowerCase() || '').includes(lowerTerm) ||
                 (agentName && agentName.includes(lowerTerm))
             );
 
-            // 2. Filtro por Agente
             const matchesAgent = !selectedAgentId || client.agent_id === selectedAgentId;
 
-            // 3. Filtro por Fecha de Creación (Alta)
             let matchesDate = true;
             if (dateFrom || dateTo) {
                 const clientDate = new Date(client.created_at).setHours(0,0,0,0);
@@ -84,7 +84,7 @@ const ClientsList: React.FC = () => {
         });
     }, [clients, searchTerm, selectedAgentId, dateFrom, dateTo, agentMap]);
 
-    // ... (Modal handlers) ...
+    // ... (Modal handlers same as before) ...
     const handleOpenModal = (client: Client) => {
         setSelectedClient(client);
         setIsModalOpen(true);
@@ -128,14 +128,13 @@ const ClientsList: React.FC = () => {
 
     return (
         <>
-            {/* ... (Filtros visuales) ... */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div className="flex flex-col gap-4 w-full md:w-auto flex-grow">
                     {/* Barra de búsqueda */}
                     <div className="relative w-full md:max-w-md">
                         <input
                             type="text"
-                            placeholder="Buscar por nombre, email, teléfono..."
+                            placeholder="Buscar por nombre, cédula, empresa..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             className="w-full bg-secondary p-2 pl-10 rounded border border-border focus:outline-none focus:ring-2 focus:ring-primary text-text-primary placeholder-text-secondary"
@@ -160,7 +159,7 @@ const ClientsList: React.FC = () => {
                                 <option key={agent.id} value={agent.id}>{agent.nombre}</option>
                             ))}
                         </select>
-                        {/* ... Fechas ... */}
+                        
                         <div className="flex items-center gap-2 bg-secondary p-1 rounded border border-border">
                             <span className="text-xs text-text-secondary ml-2">Desde:</span>
                             <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="bg-transparent text-sm p-1 focus:outline-none text-text-primary"/>
@@ -170,7 +169,7 @@ const ClientsList: React.FC = () => {
                             <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="bg-transparent text-sm p-1 focus:outline-none text-text-primary"/>
                         </div>
                         {(selectedAgentId || dateFrom || dateTo) && (
-                            <button onClick={() => { setSelectedAgentId(''); setDateFrom(''); setDateTo(''); }} className="text-xs text-red-400 hover:text-red-300 underline ml-2">Limpiar filtros</button>
+                            <button onClick={() => { setSelectedAgentId(''); setDateFrom(''); setDateTo(''); }} className="text-xs text-red-400 hover:text-red-300 underline ml-2">Limpiar</button>
                         )}
                     </div>
                 </div>
@@ -182,8 +181,10 @@ const ClientsList: React.FC = () => {
                         <thead className="border-b border-border">
                             <tr>
                                 <th className="p-4">Nombre</th>
+                                <th className="p-4">Cédula</th>
+                                <th className="p-4">Empresa</th>
                                 <th className="p-4">Email</th>
-                                <th className="p-4">Teléfono 1</th>
+                                <th className="p-4">Teléfono</th>
                                 <th className="p-4">WhatsApp</th>
                                 <th className="p-4">Fecha de Alta</th>
                                 <th className="p-4">Agente</th>
@@ -197,32 +198,20 @@ const ClientsList: React.FC = () => {
                                 return (
                                 <tr key={client.id} className="border-b border-border hover:bg-secondary">
                                     <td className="p-4 font-medium">{client.nombre}</td>
-                                    <td className="p-4 text-text-secondary">{client.email}</td>
+                                    <td className="p-4 text-text-secondary text-sm">{client.cedula || '-'}</td>
+                                    <td className="p-4 text-text-secondary text-sm">{client.empresa || '-'}</td>
+                                    <td className="p-4 text-text-secondary text-sm">{client.email}</td>
                                     <td className="p-4 text-text-secondary">
                                         {client.telefono1 ? (
-                                            <a 
-                                                href={`tel:${client.telefono1}`} 
-                                                className="hover:text-white hover:underline transition-colors"
-                                                title="Llamar"
-                                            >
-                                                {client.telefono1}
-                                            </a>
+                                            <a href={`tel:${client.telefono1}`} className="hover:text-white hover:underline transition-colors">{client.telefono1}</a>
                                         ) : ''}
                                     </td>
                                     <td className="p-4">
                                         {rawPhone ? (
-                                            <a 
-                                                href={`https://wa.me/${rawPhone}`} 
-                                                target="_blank" 
-                                                rel="noopener noreferrer"
-                                                className="text-green-500 hover:text-green-400 inline-block"
-                                                title={`Enviar WhatsApp a ${client.telefono1}`}
-                                            >
+                                            <a href={`https://wa.me/${rawPhone}`} target="_blank" rel="noopener noreferrer" className="text-green-500 hover:text-green-400 inline-block">
                                                 <WhatsAppIcon className="w-6 h-6" />
                                             </a>
-                                        ) : (
-                                            <span className="text-text-secondary text-xs opacity-50">-</span>
-                                        )}
+                                        ) : <span className="text-text-secondary text-xs opacity-50">-</span>}
                                     </td>
                                     <td className="p-4 text-text-secondary">{new Date(client.created_at).toLocaleDateString()}</td>
                                     <td className="p-4 text-blue-300">{client.agent_id ? agentMap.get(client.agent_id) : 'N/A'}</td>
@@ -237,29 +226,14 @@ const ClientsList: React.FC = () => {
                         </tbody>
                     </table>
                     {filteredClients.length === 0 && (
-                        <p className="text-center p-8 text-text-secondary">
-                            {searchTerm || selectedAgentId || dateFrom || dateTo
-                                ? `No se encontraron clientes con los filtros seleccionados.` 
-                                : 'No se encontraron clientes.'}
-                        </p>
+                        <p className="text-center p-8 text-text-secondary">No se encontraron clientes.</p>
                     )}
                 </div>
             </div>
              {isModalOpen && selectedClient && (
-                <ClientModal
-                    client={selectedClient}
-                    onClose={handleCloseModal}
-                    onSave={handleSave}
-                />
+                <ClientModal client={selectedClient} onClose={handleCloseModal} onSave={handleSave} />
             )}
-            <ConfirmationModal
-                isOpen={isConfirmModalOpen}
-                title="Confirmar Eliminación de Cliente"
-                message={`¿Estás seguro de que quieres eliminar a "${clientToDelete?.nombre}"? Esta acción no se puede deshacer y podría afectar a las pólizas asociadas.`}
-                onConfirm={handleConfirmDelete}
-                onCancel={handleCancelDelete}
-                confirmText="Eliminar"
-            />
+            <ConfirmationModal isOpen={isConfirmModalOpen} title="Confirmar Eliminación" message={`¿Borrar "${clientToDelete?.nombre}"?`} onConfirm={handleConfirmDelete} onCancel={handleCancelDelete} confirmText="Eliminar" />
         </>
     );
 };

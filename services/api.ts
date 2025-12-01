@@ -45,7 +45,7 @@ export const getAuditLogs = async () => {
     return data as unknown as AuditLog[];
 };
 
-// Auth
+// Auth (unchanged)
 export const signInWithPassword = async (email: string, password: string): Promise<{ session: Session | null; error: AuthError | null }> => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     return { session: data?.session ?? null, error };
@@ -94,7 +94,7 @@ export const updateUserPassword = async (password: string) => {
     return data;
 };
 
-// Profiles
+// Profiles (unchanged)
 export const getProfile = async (userId: string): Promise<Profile | null> => {
     const { data, error } = await supabase
         .from('profiles')
@@ -149,7 +149,7 @@ export const createNewUser = async (email: string, password: string, nombre: str
     return data;
 }
 
-// Leads (Updated for telefono1, telefono2)
+// Leads (Updated for cedula, empresa)
 export const getLeads = async () => {
     const { data, error } = await supabase.rpc('get_leads_for_user');
     if (error) throw error;
@@ -160,8 +160,8 @@ export const createLead = async (leadData: Omit<Lead, 'id' | 'created_at'>) => {
     const { data, error } = await supabase.rpc('create_lead_secure', {
         p_nombre: leadData.nombre,
         p_email: leadData.email,
-        p_telefono1: leadData.telefono1, // Changed from p_telefono
-        p_telefono2: leadData.telefono2 || null, // New field
+        p_telefono1: leadData.telefono1,
+        p_telefono2: leadData.telefono2 || null,
         p_fuente: leadData.fuente,
         p_estatus_lead: leadData.estatus_lead,
         p_notas: leadData.notas,
@@ -169,7 +169,9 @@ export const createLead = async (leadData: Omit<Lead, 'id' | 'created_at'>) => {
         p_fecha_nacimiento: leadData.fecha_nacimiento || null,
         p_ocupacion: leadData.ocupacion || null,
         p_ingresos_mensuales: leadData.ingresos_mensuales || null,
-        p_polizas_externas: leadData.polizas_externas || null
+        p_polizas_externas: leadData.polizas_externas || null,
+        p_cedula: leadData.cedula || null, // New
+        p_empresa: leadData.empresa || null // New
     }).single();
     if (error) throw error;
     return data as Lead;
@@ -190,8 +192,8 @@ export const updateLead = async (id: number, updates: Omit<Lead, 'id' | 'created
         p_id: id,
         p_nombre: updates.nombre,
         p_email: updates.email,
-        p_telefono1: updates.telefono1, // Changed from p_telefono
-        p_telefono2: updates.telefono2 || null, // New field
+        p_telefono1: updates.telefono1,
+        p_telefono2: updates.telefono2 || null,
         p_fuente: updates.fuente,
         p_estatus_lead: updates.estatus_lead,
         p_notas: updates.notas || '',
@@ -199,7 +201,9 @@ export const updateLead = async (id: number, updates: Omit<Lead, 'id' | 'created
         p_fecha_nacimiento: updates.fecha_nacimiento || null,
         p_ocupacion: updates.ocupacion || null,
         p_ingresos_mensuales: updates.ingresos_mensuales || null,
-        p_polizas_externas: updates.polizas_externas || null
+        p_polizas_externas: updates.polizas_externas || null,
+        p_cedula: updates.cedula || null, // New
+        p_empresa: updates.empresa || null // New
     }).single();
     if (error) throw error;
     return data as Lead;
@@ -217,7 +221,7 @@ export const promoteLeadToClient = async (leadId: number) => {
     return data;
 };
 
-// Clients (Updated for telefono1, telefono2)
+// Clients (Updated for cedula, empresa)
 export const getClients = async () => {
     const { data, error } = await supabase.rpc('get_clients_for_user');
     if (error) throw error;
@@ -229,13 +233,15 @@ export const updateClient = async (id: number, updates: Omit<Client, 'id' | 'cre
         p_id: id,
         p_nombre: updates.nombre,
         p_email: updates.email,
-        p_telefono1: updates.telefono1, // Changed
-        p_telefono2: updates.telefono2 || null, // New
+        p_telefono1: updates.telefono1,
+        p_telefono2: updates.telefono2 || null,
         p_fecha_nacimiento: updates.fecha_nacimiento || null,
         p_agent_id: updates.agent_id || null,
         p_ocupacion: updates.ocupacion || null,
         p_ingresos_mensuales: updates.ingresos_mensuales || null,
-        p_polizas_externas: updates.polizas_externas || null
+        p_polizas_externas: updates.polizas_externas || null,
+        p_cedula: updates.cedula || null, // New
+        p_empresa: updates.empresa || null // New
     }).single();
     if (error) throw error;
     return data as Client;
@@ -334,7 +340,7 @@ export const downloadFile = async (bucket: string, path: string, fileName: strin
     window.URL.revokeObjectURL(url);
 };
 
-// Products, Tasks, Dashboard, Monthly Goals, Reports (unchanged, except for types usage)
+
 // Products
 export const getProducts = async () => {
     const { data, error } = await supabase.rpc('get_products_for_user');
@@ -378,6 +384,7 @@ export const deleteProduct = async (id: number) => {
     if (error) throw error;
 };
 
+// Tasks
 export const getTasks = async () => {
     const { data, error } = await supabase.rpc('get_tasks_for_user');
     if (error) throw error;
@@ -421,6 +428,7 @@ export const deleteTask = async (id: number) => {
     await logActivity('DELETE', 'TASK', String(id));
 };
 
+// Dashboard
 export const getDashboardStats = async () => {
     const { data, error } = await supabase.rpc('get_dashboard_stats_for_user').single();
     if (error) throw error;
@@ -433,11 +441,13 @@ export const getLeadsByStatus = async () => {
     return data as Record<string, number>;
 };
 
+// Monthly Goals (New DB-backed logic)
 export const getMonthlyGoal = async (month: number, year: number): Promise<MonthlyGoal | null> => {
     const { data, error } = await supabase.rpc('get_monthly_goal', {
         p_month: month,
         p_year: year
     });
+    // It returns null if no row found, which is fine
     if (error) throw error;
     return data as MonthlyGoal | null;
 };
@@ -454,6 +464,8 @@ export const saveMonthlyGoal = async (goal: MonthlyGoal): Promise<MonthlyGoal> =
     return data as MonthlyGoal;
 };
 
+
+// Reports
 export const getExpiringPolicies = async (days: number) => {
     const { data, error } = await supabase.rpc('get_expiring_policies_for_user', { days_in_future: days });
     if (error) throw error;
